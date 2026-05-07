@@ -83,7 +83,7 @@ T = {
             "/watchlist add ETH - Adauga la watchlist\n"
             "/watchlist - Vezi preturile\n"
             "/watchlist remove ETH - Sterge\n\n"
-            "TRENDING\n"
+            "INFORMATII\n"
             "/trending - Trending pe CoinGecko\n"
             "/stats - Statistici piata\n"
             "/sector - Lista sectoare\n"
