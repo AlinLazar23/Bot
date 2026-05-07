@@ -432,6 +432,36 @@ def get_ema(slug, period=200, timeframe="daily"):
         logger.error("get_ema error: " + str(e))
     return None
 
+
+def get_trending_coins():
+    cached = cache_get("trending")
+    if cached is not None:
+        for coin in cached:
+            if "change_24h" not in coin["item"]:
+                coin["item"]["change_24h"] = 0
+        return cached
+    try:
+        r = requests.get(
+            "https://api.coingecko.com/api/v3/search/trending",
+            timeout=10,
+            headers={"Accept": "application/json"},
+        )
+        if r.status_code != 200:
+            return []
+        coins = r.json().get("coins", [])
+        for coin in coins:
+            item = coin["item"]
+            try:
+                chg = item["data"]["price_change_percentage_24h"]["usd"]
+                item["change_24h"] = round(chg, 2)
+            except Exception:
+                item["change_24h"] = 0
+        cache_set("trending", coins)
+        return coins
+    except Exception as e:
+        logger.error("get_trending_coins error: " + str(e))
+    return []
+
 def get_current_price_simple(slug):
     """Get current price quickly."""
     pd = get_price(slug)
@@ -739,6 +769,24 @@ async def generate_report(uid):
     return "\n".join(lines)
 
 # ─── COMMAND HANDLERS ──────────────────────────────────────────────────────────
+
+
+async def cmd_trending(update, context):
+    await update.message.reply_text("Se incarca trending...")
+    coins = get_trending_coins()
+    if not coins:
+        await update.message.reply_text("Nu s-au putut obtine datele.")
+        return
+    lines = ["Trending pe CoinGecko\n"]
+    for item in coins[:7]:
+        c         = item["item"]
+        rank      = c.get("market_cap_rank", "?")
+        chg       = c.get("change_24h", 0)
+        chg_emoji = "🟢" if chg >= 0 else "🔴"
+        sign      = "+" if chg >= 0 else ""
+        lines.append("• " + c["name"] + " (" + c["symbol"] + ")  Rank #" + str(rank) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
+    keyboard = [[InlineKeyboardButton("Refresh", callback_data="trending")]]
+    await update.message.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def cmd_start(update, context):
     uid = update.effective_user.id
@@ -1157,6 +1205,24 @@ async def button_callback(update, context):
             else:
                 lines.append(tx["symbol"] + " - " + val + "\n  " + tx["from"] + " -> " + tx["to"])
         keyboard = [[InlineKeyboardButton("Refresh", callback_data="whales")]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "trending":
+        if "trending" in _cache:
+            del _cache["trending"]
+        coins = get_trending_coins()
+        if not coins:
+            await query.edit_message_text("Nu s-au putut obtine datele.")
+            return
+        lines = ["Trending pe CoinGecko\n"]
+        for item in coins[:7]:
+            c         = item["item"]
+            rank      = c.get("market_cap_rank", "?")
+            chg       = c.get("change_24h", 0)
+            chg_emoji = "🟢" if chg >= 0 else "🔴"
+            sign      = "+" if chg >= 0 else ""
+            lines.append("• " + c["name"] + " (" + c["symbol"] + ")  Rank #" + str(rank) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
+        keyboard = [[InlineKeyboardButton("Refresh", callback_data="trending")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "help":
