@@ -83,6 +83,8 @@ T = {
             "/watchlist add ETH - Adauga la watchlist\n"
             "/watchlist - Vezi preturile\n"
             "/watchlist remove ETH - Sterge\n\n"
+            "TRENDING\n"
+            "/trending - Trending pe CoinGecko\n\n"
             "ALERTE\n"
             "/alert_ema BTC 200 - Alerta EMA200 daily\n"
             "/alert_fear 20 - Alerta Fear & Greed\n"
@@ -1356,6 +1358,7 @@ def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start",        cmd_start))
+    app.add_handler(CommandHandler("trending",     cmd_trending))
     app.add_handler(CommandHandler("help",         cmd_help))
     app.add_handler(CommandHandler("portfolio",    cmd_portfolio))
     app.add_handler(CommandHandler("pnl",          cmd_pnl))
