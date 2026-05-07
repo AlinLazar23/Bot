@@ -22,7 +22,8 @@ Commands:
     /watchlist                     - View watchlist prices
     /watchlist remove ETH          - Remove from watchlist
     /whales                        - Latest whale transactions
-    /alert_rsi BTC 30              - RSI alert
+    /alert_ema BTC daily 200       - EMA crossover alert
+    /alert_ema BTC weekly 200      - EMA weekly alert
     /alert_fear 20                 - Fear & Greed alert
     /alerts                        - View all personal alerts
     /report                        - Get daily report now
@@ -84,7 +85,8 @@ T = {
             "/watchlist - Vezi preturile\n"
             "/watchlist remove ETH - Sterge\n\n"
             "ALERTE\n"
-            "/alert_rsi BTC 30 - Alerta RSI\n"
+            "/alert_ema BTC daily 200 - Alerta EMA crossover\n"
+            "/alert_ema BTC weekly 200 - Alerta EMA weekly\n"
             "/alert_fear 20 - Alerta Fear & Greed\n"
             "/alerts - Alertele tale\n\n"
             "RAPOARTE\n"
