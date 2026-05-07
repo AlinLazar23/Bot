@@ -84,7 +84,10 @@ T = {
             "/watchlist - Vezi preturile\n"
             "/watchlist remove ETH - Sterge\n\n"
             "TRENDING\n"
-            "/trending - Trending pe CoinGecko\n\n"
+            "/trending - Trending pe CoinGecko\n"
+            "/stats - Statistici piata\n"
+            "/sector - Lista sectoare\n"
+            "/sector <nume> - Ex: /sector ai\n\n"
             "ALERTE\n"
             "/alert_ema BTC 200 - Alerta EMA200 daily\n"
             "/alert_fear 20 - Alerta Fear & Greed\n"
@@ -773,6 +776,225 @@ async def generate_report(uid):
 # ─── COMMAND HANDLERS ──────────────────────────────────────────────────────────
 
 
+
+# ─── SECTOARE ──────────────────────────────────────────────────────────────────
+SECTORS = {
+    "ai":      ("artificial-intelligence",   "AI & Big Data"),
+    "defi":    ("decentralized-finance-defi","DeFi"),
+    "gaming":  ("gaming",                    "Gaming & GameFi"),
+    "layer1":  ("layer-1",                   "Layer 1"),
+    "layer2":  ("layer-2",                   "Layer 2"),
+    "rwa":     ("real-world-assets-rwa",     "Real World Assets"),
+    "privacy": ("privacy-coins",             "Privacy Coins"),
+}
+
+def get_sector_coins_data(category_id, limit=15):
+    cached = cache_get("sector:" + category_id)
+    if cached is not None:
+        return cached
+    try:
+        r = requests.get(
+            "https://api.coingecko.com/api/v3/coins/markets",
+            params={
+                "vs_currency": "usd",
+                "category": category_id,
+                "order": "market_cap_desc",
+                "per_page": limit,
+                "page": 1,
+                "sparkline": "false",
+            },
+            timeout=15,
+            headers={"Accept": "application/json"},
+        )
+        if r.status_code == 200:
+            result = [{
+                "symbol":     c["symbol"].upper(),
+                "name":       c["name"],
+                "price":      c.get("current_price", 0),
+                "change_24h": c.get("price_change_percentage_24h") or 0,
+                "rank":       c.get("market_cap_rank", "?"),
+            } for c in r.json()]
+            cache_set("sector:" + category_id, result)
+            return result
+    except Exception as e:
+        logger.error("get_sector_coins_data error: " + str(e))
+    return []
+
+def get_global_market():
+    cached = cache_get("global_market")
+    if cached is not None:
+        return cached
+    try:
+        r = requests.get(
+            "https://api.coingecko.com/api/v3/global",
+            timeout=10,
+            headers={"Accept": "application/json"},
+        )
+        if r.status_code == 200:
+            d = r.json().get("data", {})
+            result = {
+                "total_market_cap":      d.get("total_market_cap", {}).get("usd", 0),
+                "total_volume_24h":      d.get("total_volume", {}).get("usd", 0),
+                "btc_dominance":         round(d.get("market_cap_percentage", {}).get("btc", 0), 2),
+                "eth_dominance":         round(d.get("market_cap_percentage", {}).get("eth", 0), 2),
+                "market_cap_change_24h": d.get("market_cap_change_percentage_24h_usd", 0),
+            }
+            cache_set("global_market", result)
+            return result
+    except Exception as e:
+        logger.error("get_global_market error: " + str(e))
+    return None
+
+def get_btc_eth_prices():
+    cached = cache_get("btc_eth_prices")
+    if cached is not None:
+        return cached
+    try:
+        r = requests.get(
+            "https://api.coingecko.com/api/v3/coins/markets",
+            params={
+                "vs_currency": "usd", "ids": "bitcoin,ethereum",
+                "order": "market_cap_desc", "per_page": 2,
+                "page": 1, "sparkline": "false",
+            },
+            timeout=10,
+            headers={"Accept": "application/json"},
+        )
+        if r.status_code == 200:
+            result = {}
+            for c in r.json():
+                if c["id"] == "bitcoin":
+                    result["btc_price"]  = c.get("current_price", 0)
+                    result["btc_change"] = c.get("price_change_percentage_24h") or 0
+                elif c["id"] == "ethereum":
+                    result["eth_price"]  = c.get("current_price", 0)
+                    result["eth_change"] = c.get("price_change_percentage_24h") or 0
+            cache_set("btc_eth_prices", result)
+            return result
+    except Exception as e:
+        logger.error("get_btc_eth_prices error: " + str(e))
+    return {}
+
+def get_fear_greed_stats():
+    cached = cache_get("fear_greed_stats")
+    if cached is not None:
+        return cached
+    try:
+        r = requests.get("https://api.alternative.me/fng/?limit=8", timeout=10)
+        if r.status_code == 200:
+            data = r.json().get("data", [])
+            if data:
+                week_vals = [int(d["value"]) for d in data]
+                result = {
+                    "value":     int(data[0]["value"]),
+                    "label":     data[0]["value_classification"],
+                    "yesterday": int(data[1]["value"]) if len(data) > 1 else int(data[0]["value"]),
+                    "week_avg":  round(sum(week_vals) / len(week_vals), 1),
+                }
+                cache_set("fear_greed_stats", result)
+                return result
+    except Exception as e:
+        logger.error("get_fear_greed_stats error: " + str(e))
+    return None
+
+def fng_bar(value):
+    filled = value // 10
+    return "█" * filled + "░" * (10 - filled)
+
+def format_stats_full(fg, global_data, prices):
+    utc_now = datetime.datetime.now(datetime.timezone.utc)
+    year = utc_now.year
+    march_last_sunday = max(
+        datetime.datetime(year, 3, day, 1, tzinfo=datetime.timezone.utc)
+        for day in range(25, 32)
+        if datetime.datetime(year, 3, day).weekday() == 6
+    )
+    oct_last_sunday = max(
+        datetime.datetime(year, 10, day, 1, tzinfo=datetime.timezone.utc)
+        for day in range(25, 32)
+        if datetime.datetime(year, 10, day).weekday() == 6
+    )
+    if march_last_sunday <= utc_now < oct_last_sunday:
+        ro_offset = datetime.timedelta(hours=3)
+        ro_label  = "EEST"
+    else:
+        ro_offset = datetime.timedelta(hours=2)
+        ro_label  = "EET"
+    ro_now = utc_now + ro_offset
+    now = ro_now.strftime("%H:%M " + ro_label + " (%d.%m.%Y)")
+
+    fng_val   = fg["value"]
+    fng_label = fg["label"]
+    fng_trend = fng_val - fg["yesterday"]
+    if fng_trend > 0:
+        trend_arrow = "sus +" + str(fng_trend)
+    elif fng_trend < 0:
+        trend_arrow = "jos " + str(fng_trend)
+    else:
+        trend_arrow = "stabil"
+    bar = fng_bar(fng_val)
+
+    # Fear & Greed emoji
+    if fng_val <= 25:   fng_emoji = "😱"
+    elif fng_val <= 45: fng_emoji = "😰"
+    elif fng_val <= 55: fng_emoji = "😐"
+    elif fng_val <= 75: fng_emoji = "😄"
+    else:               fng_emoji = "🤑"
+
+    # Interpret
+    if fng_val <= 20:   interpret = "Panica extrema - zona istorica de acumulare"
+    elif fng_val <= 40: interpret = "Frica in piata - posibila oportunitate de cumparare"
+    elif fng_val <= 60: interpret = "Piata este neutra - asteapta confirmare directie"
+    elif fng_val <= 80: interpret = "Lacomie crescuta - fii precaut, nu urmari FOMO"
+    else:               interpret = "Euforie extrema - risc ridicat de corectie"
+
+    # Market score
+    score = 5.0
+    if fng_val <= 20:   score += 1.5
+    elif fng_val <= 40: score += 0.5
+    elif fng_val <= 80: score -= 0.5
+    else:               score -= 1.5
+    cap_chg = global_data.get("market_cap_change_24h", 0)
+    if cap_chg > 3:    score += 1.0
+    elif cap_chg > 1:  score += 0.5
+    elif cap_chg < -3: score -= 1.0
+    elif cap_chg < -1: score -= 0.5
+    btc_chg = prices.get("btc_change", 0)
+    if btc_chg > 3:  score += 0.5
+    elif btc_chg < -3: score -= 0.5
+    score = max(1, min(10, round(score)))
+    score_bar = "X" * score + "." * (10 - score)
+    if score <= 3:   score_label = "Bearish"
+    elif score <= 4: score_label = "Slab Bearish"
+    elif score <= 6: score_label = "Neutru"
+    elif score <= 8: score_label = "Bullish"
+    else:            score_label = "Strong Bullish"
+
+    cap_arrow = "🟢" if cap_chg >= 0 else "🔴"
+    btc_arrow = "🟢" if btc_chg >= 0 else "🔴"
+    eth_arrow = "🟢" if prices.get("eth_change", 0) >= 0 else "🔴"
+
+    text = (
+        "Market Stats - " + now + "\n\n"
+        "SENTIMENT PIATA\n"
+        + fng_emoji + " Fear & Greed: " + str(fng_val) + "/100 - " + fng_label + "\n"
+        "[" + bar + "]\n"
+        "Fata de ieri: " + trend_arrow + "\n"
+        "Media 7 zile: " + str(fg["week_avg"]) + "/100\n"
+        + interpret + "\n\n"
+        "OVERVIEW PIATA\n"
+        "BTC:  " + fmt_price(prices.get("btc_price", 0)) + "  " + btc_arrow + " " + "{:.1f}%".format(abs(btc_chg)) + "\n"
+        "ETH:  " + fmt_price(prices.get("eth_price", 0)) + "  " + eth_arrow + " " + "{:.1f}%".format(abs(prices.get("eth_change", 0))) + "\n"
+        "Mkt Cap: " + fmt_large(global_data.get("total_market_cap", 0)) + "  " + cap_arrow + " " + "{:.1f}%".format(abs(cap_chg)) + "\n"
+        "Volum 24h: " + fmt_large(global_data.get("total_volume_24h", 0)) + "\n"
+        "BTC Dominance: " + str(global_data.get("btc_dominance", 0)) + "%\n"
+        "ETH Dominance: " + str(global_data.get("eth_dominance", 0)) + "%\n\n"
+        "MARKET SCORE: " + str(score) + "/10 - " + score_label + "\n"
+        "[" + score_bar + "]\n"
+        "Bazat pe: sentiment + trend + volum + dominance"
+    )
+    return text
+
 async def cmd_trending(update, context):
     await update.message.reply_text("Se incarca trending...")
     coins = get_trending_coins()
@@ -788,6 +1010,54 @@ async def cmd_trending(update, context):
         sign      = "+" if chg >= 0 else ""
         lines.append("• " + c["name"] + " (" + c["symbol"] + ")  Rank #" + str(rank) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
     keyboard = [[InlineKeyboardButton("Refresh", callback_data="trending")]]
+    await update.message.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def cmd_stats(update, context):
+    msg = await update.message.reply_text("Se calculeaza statisticile pietei...")
+    fg = global_data = prices = None
+    for attempt in range(3):
+        if attempt > 0:
+            await asyncio.sleep(2)
+        fg          = get_fear_greed_stats()
+        time.sleep(0.5)
+        global_data = get_global_market()
+        time.sleep(0.5)
+        prices      = get_btc_eth_prices()
+        if fg and global_data and prices:
+            break
+    if not fg or not global_data or not prices:
+        await msg.edit_text("Nu s-au putut obtine datele. Incearca din nou in 1 minut.")
+        return
+    text = format_stats_full(fg, global_data, prices)
+    keyboard = [[InlineKeyboardButton("Refresh", callback_data="stats_full")]]
+    await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def cmd_sector(update, context):
+    if not context.args:
+        lines = ["Sectoare disponibile:\n"]
+        for key, (_, label) in SECTORS.items():
+            lines.append("• /sector " + key + " - " + label)
+        lines.append("\nEx: /sector ai")
+        await update.message.reply_text("\n".join(lines))
+        return
+    key = context.args[0].lower()
+    if key not in SECTORS:
+        await update.message.reply_text("Sector necunoscut. Scrie /sector pentru lista.")
+        return
+    category_id, label = SECTORS[key]
+    await update.message.reply_text("Se incarca sectorul " + label + "...")
+    coins = get_sector_coins_data(category_id)
+    if not coins:
+        await update.message.reply_text("Nu s-au putut obtine datele. Incearca din nou.")
+        return
+    lines = [label + " - Top " + str(len(coins)) + " dupa market cap\n"]
+    for c in coins:
+        chg       = c["change_24h"]
+        chg_emoji = "🟢" if chg >= 0 else "🔴"
+        sign      = "+" if chg >= 0 else ""
+        lines.append(c["symbol"] + " #" + str(c["rank"]) + "  " + fmt_price(c["price"]) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
+    keyboard = [[InlineKeyboardButton("Refresh", callback_data="sector_cb:" + key)]]
     await update.message.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def cmd_start(update, context):
@@ -1227,6 +1497,44 @@ async def button_callback(update, context):
         keyboard = [[InlineKeyboardButton("Refresh", callback_data="trending")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
+    elif data == "stats_full":
+        fg = global_data = prices = None
+        for attempt in range(3):
+            if attempt > 0:
+                await asyncio.sleep(2)
+            fg          = get_fear_greed_stats()
+            time.sleep(0.5)
+            global_data = get_global_market()
+            time.sleep(0.5)
+            prices      = get_btc_eth_prices()
+            if fg and global_data and prices:
+                break
+        if not fg or not global_data or not prices:
+            await query.edit_message_text("Nu s-au putut obtine datele.")
+            return
+        text = format_stats_full(fg, global_data, prices)
+        keyboard = [[InlineKeyboardButton("Refresh", callback_data="stats_full")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data.startswith("sector_cb:"):
+        key = data.split(":", 1)[1]
+        if key not in SECTORS:
+            await query.answer("Sector invalid.")
+            return
+        category_id, label = SECTORS[key]
+        coins = get_sector_coins_data(category_id)
+        if not coins:
+            await query.edit_message_text("Nu s-au putut obtine datele.")
+            return
+        lines = [label + " - Top " + str(len(coins)) + " dupa market cap\n"]
+        for c in coins:
+            chg       = c["change_24h"]
+            chg_emoji = "🟢" if chg >= 0 else "🔴"
+            sign      = "+" if chg >= 0 else ""
+            lines.append(c["symbol"] + " #" + str(c["rank"]) + "  " + fmt_price(c["price"]) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
+        keyboard = [[InlineKeyboardButton("Refresh", callback_data="sector_cb:" + key)]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
     elif data == "help":
         await query.edit_message_text(t(uid, "help"))
 
@@ -1359,6 +1667,8 @@ def main():
 
     app.add_handler(CommandHandler("start",        cmd_start))
     app.add_handler(CommandHandler("trending",     cmd_trending))
+    app.add_handler(CommandHandler("stats",       cmd_stats))
+    app.add_handler(CommandHandler("sector",      cmd_sector))
     app.add_handler(CommandHandler("help",         cmd_help))
     app.add_handler(CommandHandler("portfolio",    cmd_portfolio))
     app.add_handler(CommandHandler("pnl",          cmd_pnl))
