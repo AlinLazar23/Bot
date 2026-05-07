@@ -792,87 +792,105 @@ def get_sector_coins_data(category_id, limit=15):
     cached = cache_get("sector:" + category_id)
     if cached is not None:
         return cached
-    try:
-        r = requests.get(
-            "https://api.coingecko.com/api/v3/coins/markets",
-            params={
-                "vs_currency": "usd",
-                "category": category_id,
-                "order": "market_cap_desc",
-                "per_page": limit,
-                "page": 1,
-                "sparkline": "false",
-            },
-            timeout=15,
-            headers={"Accept": "application/json"},
-        )
-        if r.status_code == 200:
-            result = [{
-                "symbol":     c["symbol"].upper(),
-                "name":       c["name"],
-                "price":      c.get("current_price", 0),
-                "change_24h": c.get("price_change_percentage_24h") or 0,
-                "rank":       c.get("market_cap_rank", "?"),
-            } for c in r.json()]
-            cache_set("sector:" + category_id, result)
-            return result
-    except Exception as e:
-        logger.error("get_sector_coins_data error: " + str(e))
+    for attempt in range(3):
+        if attempt > 0:
+            time.sleep(10)
+        try:
+            r = requests.get(
+                "https://api.coingecko.com/api/v3/coins/markets",
+                params={
+                    "vs_currency": "usd",
+                    "category": category_id,
+                    "order": "market_cap_desc",
+                    "per_page": limit,
+                    "page": 1,
+                    "sparkline": "false",
+                },
+                timeout=20,
+                headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
+            )
+            if r.status_code == 429:
+                time.sleep(int(r.headers.get("Retry-After", 30)))
+                continue
+            if r.status_code == 200:
+                result = [{
+                    "symbol":     c["symbol"].upper(),
+                    "name":       c["name"],
+                    "price":      c.get("current_price", 0),
+                    "change_24h": c.get("price_change_percentage_24h") or 0,
+                    "rank":       c.get("market_cap_rank", "?"),
+                } for c in r.json()]
+                cache_set("sector:" + category_id, result)
+                return result
+        except Exception as e:
+            logger.error("get_sector_coins_data error: " + str(e))
     return []
 
 def get_global_market():
     cached = cache_get("global_market")
     if cached is not None:
         return cached
-    try:
-        r = requests.get(
-            "https://api.coingecko.com/api/v3/global",
-            timeout=10,
-            headers={"Accept": "application/json"},
-        )
-        if r.status_code == 200:
-            d = r.json().get("data", {})
-            result = {
-                "total_market_cap":      d.get("total_market_cap", {}).get("usd", 0),
-                "total_volume_24h":      d.get("total_volume", {}).get("usd", 0),
-                "btc_dominance":         round(d.get("market_cap_percentage", {}).get("btc", 0), 2),
-                "eth_dominance":         round(d.get("market_cap_percentage", {}).get("eth", 0), 2),
-                "market_cap_change_24h": d.get("market_cap_change_percentage_24h_usd", 0),
-            }
-            cache_set("global_market", result)
-            return result
-    except Exception as e:
-        logger.error("get_global_market error: " + str(e))
+    for attempt in range(3):
+        if attempt > 0:
+            time.sleep(8)
+        try:
+            r = requests.get(
+                "https://api.coingecko.com/api/v3/global",
+                timeout=15,
+                headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
+            )
+            if r.status_code == 429:
+                time.sleep(int(r.headers.get("Retry-After", 30)))
+                continue
+            if r.status_code == 200:
+                d = r.json().get("data", {})
+                result = {
+                    "total_market_cap":      d.get("total_market_cap", {}).get("usd", 0),
+                    "total_volume_24h":      d.get("total_volume", {}).get("usd", 0),
+                    "btc_dominance":         round(d.get("market_cap_percentage", {}).get("btc", 0), 2),
+                    "eth_dominance":         round(d.get("market_cap_percentage", {}).get("eth", 0), 2),
+                    "market_cap_change_24h": d.get("market_cap_change_percentage_24h_usd", 0),
+                }
+                cache_set("global_market", result)
+                return result
+        except Exception as e:
+            logger.error("get_global_market error: " + str(e))
     return None
 
 def get_btc_eth_prices():
     cached = cache_get("btc_eth_prices")
     if cached is not None:
         return cached
-    try:
-        r = requests.get(
-            "https://api.coingecko.com/api/v3/coins/markets",
-            params={
-                "vs_currency": "usd", "ids": "bitcoin,ethereum",
-                "order": "market_cap_desc", "per_page": 2,
-                "page": 1, "sparkline": "false",
-            },
-            timeout=10,
-            headers={"Accept": "application/json"},
-        )
-        if r.status_code == 200:
-            result = {}
-            for c in r.json():
-                if c["id"] == "bitcoin":
-                    result["btc_price"]  = c.get("current_price", 0)
-                    result["btc_change"] = c.get("price_change_percentage_24h") or 0
-                elif c["id"] == "ethereum":
-                    result["eth_price"]  = c.get("current_price", 0)
-                    result["eth_change"] = c.get("price_change_percentage_24h") or 0
-            cache_set("btc_eth_prices", result)
-            return result
-    except Exception as e:
-        logger.error("get_btc_eth_prices error: " + str(e))
+    for attempt in range(3):
+        if attempt > 0:
+            time.sleep(8)
+        try:
+            r = requests.get(
+                "https://api.coingecko.com/api/v3/coins/markets",
+                params={
+                    "vs_currency": "usd", "ids": "bitcoin,ethereum",
+                    "order": "market_cap_desc", "per_page": 2,
+                    "page": 1, "sparkline": "false",
+                },
+                timeout=15,
+                headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
+            )
+            if r.status_code == 429:
+                time.sleep(int(r.headers.get("Retry-After", 30)))
+                continue
+            if r.status_code == 200:
+                result = {}
+                for c in r.json():
+                    if c["id"] == "bitcoin":
+                        result["btc_price"]  = c.get("current_price", 0)
+                        result["btc_change"] = c.get("price_change_percentage_24h") or 0
+                    elif c["id"] == "ethereum":
+                        result["eth_price"]  = c.get("current_price", 0)
+                        result["eth_change"] = c.get("price_change_percentage_24h") or 0
+                cache_set("btc_eth_prices", result)
+                return result
+        except Exception as e:
+            logger.error("get_btc_eth_prices error: " + str(e))
     return {}
 
 def get_fear_greed_stats():
