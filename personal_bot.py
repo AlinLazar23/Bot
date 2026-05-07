@@ -56,7 +56,7 @@ COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 WHALE_API      = "https://api.whale-alert.io/v1/transactions"
 WHALE_API_KEY  = os.environ.get("WHALE_API_KEY", "")  # Optional - whale-alert.io free key
 DATA_FILE      = "user_data.json"
-CHECK_INTERVAL = 300   # 5 min - check technical alerts
+CHECK_INTERVAL = 60    # 1 min - check technical alerts
 WHALE_INTERVAL = 600   # 10 min - check whale transactions
 WHALE_MIN_USD  = 1000000  # Minimum $1M for whale alert
 
@@ -372,10 +372,11 @@ def get_full_data(slug):
     cache_set("full:" + slug, result)
     return result
 
-def get_fear_greed():
-    cached = cache_get("fear_greed")
-    if cached:
-        return cached
+def get_fear_greed(fresh=False):
+    if not fresh:
+        cached = cache_get("fear_greed")
+        if cached:
+            return cached
     try:
         r = requests.get("https://api.alternative.me/fng/?limit=2", timeout=10)
         if r.status_code == 200:
@@ -1096,14 +1097,18 @@ async def button_callback(update, context):
 
 async def check_technical_alerts(context):
     """Check RSI and Fear & Greed alerts for all users."""
-    fg = get_fear_greed()
+    fg = get_fear_greed(fresh=True)
+    if fg:
+        logger.info("Fear & Greed check: " + str(fg["value"]))
     for uid, user in list(user_data.items()):
         alerts = user.get("alerts", {})
 
-        # Fear & Greed alert
+        # Fear & Greed alert - trimite o singura data pana se revine peste prag
         fear_threshold = alerts.get("fear")
         if fg and fear_threshold is not None:
-            if fg["value"] <= fear_threshold:
+            alert_key = "fear_sent_" + str(uid)
+            already_sent = user.get("_fear_alert_sent", False)
+            if fg["value"] <= fear_threshold and not already_sent:
                 try:
                     await context.bot.send_message(
                         chat_id=uid,
@@ -1113,8 +1118,14 @@ async def check_technical_alerts(context):
                             "Your threshold: below " + str(fear_threshold)
                         )
                     )
+                    user["_fear_alert_sent"] = True
+                    save_data()
                 except Exception as e:
                     logger.error("Fear alert error: " + str(e))
+            elif fg["value"] > fear_threshold and already_sent:
+                # Reseteaza cand revine peste prag
+                user["_fear_alert_sent"] = False
+                save_data()
 
         # RSI alerts
         rsi_alerts = alerts.get("rsi", {})
@@ -1202,7 +1213,6 @@ def main():
 
     # Background jobs
     app.job_queue.run_repeating(check_technical_alerts, interval=CHECK_INTERVAL, first=60)
-    app.job_queue.run_repeating(check_whale_alerts,     interval=WHALE_INTERVAL, first=30)
     app.job_queue.run_repeating(check_daily_reports,    interval=60,             first=30)
 
     print("CryptoPersonal Bot running...")
