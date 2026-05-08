@@ -433,21 +433,34 @@ def get_sector_coins(category_id, limit=15):
     cached = cache_get("sector:" + category_id)
     if cached:
         return cached
-    data = cg_get("/coins/markets", params={
-        "vs_currency": "usd", "category": category_id,
-        "order": "market_cap_desc", "per_page": limit, "page": 1, "sparkline": "false",
-    })
-    if not data:
-        return []
-    result = [{
-        "symbol":     c["symbol"].upper(),
-        "name":       c["name"],
-        "price":      c.get("current_price", 0),
-        "change_24h": c.get("price_change_percentage_24h") or 0,
-        "rank":       c.get("market_cap_rank", "?"),
-    } for c in data]
-    cache_set("sector:" + category_id, result)
-    return result
+    # Sector coins au cache TTL mai mare (10 min) ca sa nu faca request la fiecare click
+    try:
+        r = requests.get(
+            COINGECKO_BASE + "/coins/markets",
+            params={
+                "vs_currency": "usd", "category": category_id,
+                "order": "market_cap_desc", "per_page": limit,
+                "page": 1, "sparkline": "false",
+            },
+            timeout=10,
+            headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
+        )
+        if r.status_code == 200:
+            result = [{
+                "symbol":     c["symbol"].upper(),
+                "name":       c["name"],
+                "price":      c.get("current_price", 0),
+                "change_24h": c.get("price_change_percentage_24h") or 0,
+                "rank":       c.get("market_cap_rank", "?"),
+            } for c in r.json()]
+            # Cache 10 minute pentru sectoare
+            _cache["sector:" + category_id] = (result, time.time() - CACHE_TTL + 600)
+            return result
+        elif r.status_code == 429:
+            time.sleep(int(r.headers.get("Retry-After", 15)))
+    except Exception as e:
+        logger.error("get_sector_coins error: " + str(e))
+    return []
 
 def get_whale_transactions():
     cached = cache_get("whales")
