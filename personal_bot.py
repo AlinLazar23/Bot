@@ -31,7 +31,7 @@ from telegram.ext import (
 )
 
 # ─── CONFIG ────────────────────────────────────────────────────────────────────
-BOT_TOKEN      = os.environ.get("BOT_TOKEN", "8403967516:AAE2MGRsx0d_vDfDL_Janh9167DVptkOopY")
+BOT_TOKEN      = os.environ.get("BOT_TOKEN", "")
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 WHALE_API      = "https://api.whale-alert.io/v1/transactions"
 WHALE_API_KEY  = os.environ.get("WHALE_API_KEY", "")
@@ -713,53 +713,69 @@ def help_main_keyboard():
 def back_keyboard():
     return InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_back")]])
 
-HELP_TEXTS = {
-    "help_portfolio": (
-        "📁 PORTOFOLIU\n\n"
-        "/portfolio - Vezi portofoliul complet\n"
-        "/portfolio add BTC 0.5 45000 - Adauga moneda\n"
-        "/portfolio remove BTC - Sterge moneda\n"
-        "/pnl - Raport Profit si Loss\n"
-        "/risk - Scor de risc portofoliu"
-    ),
-    "help_watchlist": (
-        "👁 WATCHLIST\n\n"
-        "/watchlist - Vezi preturile live\n"
-        "/watchlist add ETH - Adauga moneda\n"
-        "/watchlist remove ETH - Sterge moneda"
-    ),
-    "help_alerts": (
-        "🔔 ALERTE\n\n"
-        "/alert_ema BTC 200 - Alerta EMA200 daily crossover\n"
-        "/alert_fear 20 - Alerta cand Fear & Greed scade sub prag\n"
-        "/alerts - Vezi alertele active"
-    ),
-    "help_reports": (
-        "📊 RAPOARTE\n\n"
-        "/report - Genereaza raport personal acum\n"
-        "/set_report 08:00 - Seteaza ora raportului zilnic"
-    ),
-    "help_market": (
-        "📈 PIATA\n\n"
-        "/trending - Trending pe CoinGecko\n"
-        "/stats - Statistici piata (Fear & Greed, Dominance, Market Cap)\n"
-        "/sector - Lista sectoare crypto\n"
-        "/sector ai - Monede din sectorul AI\n"
-        "Sectoare: ai, defi, gaming, layer1, layer2, rwa, privacy"
-    ),
-    "help_whales": (
-        "🐋 BALENE\n\n"
-        "/whales - Ultimele tranzactii mari (peste $1M)"
-    ),
-    "help_settings": (
-        "⚙️ SETARI\n\n"
-        "/set_lang ro - Seteaza limba romana\n"
-        "/set_lang en - Seteaza limba engleza\n"
-        "/set_currency USD - Seteaza moneda (USD/EUR/GBP/RON)\n"
-        "/set_report 08:00 - Ora raportului zilnic\n"
-        "/chatid - Afiseaza chat ID si user ID"
-    ),
+# Category keyboards for help menu
+HELP_KEYBOARDS = {
+    "help_portfolio": {
+        "title": "📁 Portofoliu",
+        "keyboard": [
+            [InlineKeyboardButton("📊 Vezi Portofoliu",  callback_data="exec_portfolio")],
+            [InlineKeyboardButton("📈 P&L Report",       callback_data="exec_pnl")],
+            [InlineKeyboardButton("⚠️ Scor de Risc",     callback_data="exec_risk")],
+            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
+        ]
+    },
+    "help_watchlist": {
+        "title": "👁 Watchlist",
+        "keyboard": [
+            [InlineKeyboardButton("👁 Vezi Watchlist",   callback_data="exec_watchlist")],
+            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
+        ]
+    },
+    "help_alerts": {
+        "title": "🔔 Alerte",
+        "keyboard": [
+            [InlineKeyboardButton("🔔 Alertele Mele",    callback_data="exec_alerts")],
+            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
+        ]
+    },
+    "help_reports": {
+        "title": "📊 Rapoarte",
+        "keyboard": [
+            [InlineKeyboardButton("📊 Raport Acum",      callback_data="exec_report")],
+            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
+        ]
+    },
+    "help_market": {
+        "title": "📈 Piata",
+        "keyboard": [
+            [InlineKeyboardButton("🔥 Trending",         callback_data="exec_trending")],
+            [InlineKeyboardButton("📊 Stats Piata",      callback_data="exec_stats")],
+            [InlineKeyboardButton("🏭 Sectoare",         callback_data="exec_sector_list")],
+            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
+        ]
+    },
+    "help_whales": {
+        "title": "🐋 Balene",
+        "keyboard": [
+            [InlineKeyboardButton("🐋 Vezi Tranzactii",  callback_data="exec_whales")],
+            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
+        ]
+    },
+    "help_settings": {
+        "title": "⚙️ Setari",
+        "keyboard": [
+            [InlineKeyboardButton("🇷🇴 Limba Romana",    callback_data="exec_lang_ro")],
+            [InlineKeyboardButton("🇬🇧 English",         callback_data="exec_lang_en")],
+            [InlineKeyboardButton("💵 USD",              callback_data="exec_cur_USD"),
+             InlineKeyboardButton("💶 EUR",              callback_data="exec_cur_EUR")],
+            [InlineKeyboardButton("💷 GBP",              callback_data="exec_cur_GBP"),
+             InlineKeyboardButton("🇷🇴 RON",             callback_data="exec_cur_RON")],
+            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
+        ]
+    },
 }
+
+HELP_TEXTS = {k: v for k, v in HELP_KEYBOARDS.items()}  # kept for compatibility
 
 # ─── COMMAND HANDLERS ──────────────────────────────────────────────────────────
 
@@ -1134,8 +1150,11 @@ async def button_callback(update, context):
         await query.edit_message_text("Alege o categorie:", reply_markup=help_main_keyboard())
         return
 
-    if data in HELP_TEXTS:
-        await query.edit_message_text(HELP_TEXTS[data], reply_markup=back_keyboard())
+    if data in HELP_KEYBOARDS:
+        cat = HELP_KEYBOARDS[data]
+        await query.edit_message_text(
+            cat["title"],
+            reply_markup=InlineKeyboardMarkup(cat["keyboard"]))
         return
 
     # ── Portfolio ──────────────────────────────────────────────────────────────
@@ -1252,6 +1271,214 @@ async def button_callback(update, context):
             lines.append(c["symbol"] + " #" + str(c["rank"]) + "  " + fmt_price(c["price"]) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
         keyboard = [[InlineKeyboardButton("Refresh", callback_data="sector_cb:" + key)]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    # ── Exec callbacks from help menu ─────────────────────────────────────────
+    elif data == "exec_portfolio":
+        user = get_user(uid)
+        if not user.get("portfolio"):
+            await query.edit_message_text(
+                t(uid, "portfolio_empty"),
+                reply_markup=back_keyboard())
+            return
+        pf = calculate_portfolio(uid)
+        if not pf:
+            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard())
+            return
+        currency = user.get("currency", "USD")
+        lines = ["Your Portfolio\n"]
+        for c in pf["coins"]:
+            lines.append(
+                c["symbol"] + " x" + str(c["amount"]) + "\n"
+                "  Value:  " + fmt_currency(c["current_value"], currency) + "\n"
+                "  Price:  " + fmt_price(c["current_price"]) + "\n"
+                "  24h:    " + fmt_pct(c["change_24h"]) + "\n"
+                "  P&L:    " + fmt_currency(c["pnl"], currency) + " (" + fmt_pct(c["pnl_pct"]) + ")\n"
+            )
+        lines.append("\nTOTAL VALUE: " + fmt_currency(pf["total_value"], currency))
+        lines.append("TOTAL P&L:   " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_portfolio")],
+                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_portfolio")]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "exec_pnl":
+        user = get_user(uid)
+        if not user.get("portfolio"):
+            await query.edit_message_text(t(uid, "pnl_empty"), reply_markup=back_keyboard())
+            return
+        pf = calculate_portfolio(uid)
+        if not pf:
+            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard())
+            return
+        currency = user.get("currency", "USD")
+        lines = ["P&L Report\n"]
+        for c in sorted(pf["coins"], key=lambda x: x["pnl_pct"], reverse=True):
+            emoji = "🟢" if c["pnl"] >= 0 else "🔴"
+            lines.append(
+                emoji + " " + c["symbol"] + "\n"
+                "  Buy: " + fmt_price(c["buy_price"]) + " -> Now: " + fmt_price(c["current_price"]) + "\n"
+                "  P&L: " + fmt_currency(c["pnl"], currency) + " (" + fmt_pct(c["pnl_pct"]) + ")\n"
+            )
+        emoji = "🟢" if pf["total_pnl"] >= 0 else "🔴"
+        lines.append(emoji + " TOTAL: " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
+        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "exec_risk":
+        user = get_user(uid)
+        if not user.get("portfolio"):
+            await query.edit_message_text(t(uid, "portfolio_empty"), reply_markup=back_keyboard())
+            return
+        pf    = calculate_portfolio(uid)
+        score, label, notes = calculate_risk_score(pf)
+        bar   = "X" * score + "." * (10 - score)
+        lines = [t(uid, "risk_title") + "\n", "Score: " + str(score) + "/10 - " + label, "[" + bar + "]\n"]
+        for note in notes:
+            lines.append("- " + note)
+        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "exec_watchlist":
+        user = get_user(uid)
+        if not user.get("watchlist"):
+            await query.edit_message_text(t(uid, "watchlist_empty"), reply_markup=back_keyboard())
+            return
+        lines = ["Watchlist\n"]
+        for symbol in user["watchlist"]:
+            pd = get_price(resolve_slug(symbol))
+            time.sleep(0.3)
+            if pd:
+                lines.append(symbol + ": " + fmt_price(pd["price"]) + " | " + fmt_pct(pd.get("change_24h", 0)))
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_watchlist")],
+                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_watchlist")]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "exec_alerts":
+        user   = get_user(uid)
+        alerts = user.get("alerts", {})
+        ema_a  = alerts.get("ema", {})
+        fear_a = alerts.get("fear")
+        if not ema_a and not fear_a:
+            await query.edit_message_text(t(uid, "alerts_empty"), reply_markup=back_keyboard())
+            return
+        lines = ["Your Alerts\n"]
+        if ema_a:
+            lines.append("EMA Alerts:")
+            for key, info in ema_a.items():
+                lines.append("  " + info["symbol"] + " EMA" + str(info["period"]) + " DAILY (" + info["position"] + " EMA)")
+        if fear_a:
+            lines.append("Fear & Greed Alert: < " + str(fear_a))
+        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_alerts")]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "exec_report":
+        text = await generate_report(uid)
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_report")],
+                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_reports")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "exec_trending":
+        if "trending" in _cache:
+            del _cache["trending"]
+        coins = get_trending_coins()
+        if not coins:
+            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard())
+            return
+        lines = ["Trending pe CoinGecko\n"]
+        for item in coins[:7]:
+            c         = item["item"]
+            rank      = c.get("market_cap_rank", "?")
+            chg       = c.get("change_24h", 0)
+            chg_emoji = "🟢" if chg >= 0 else "🔴"
+            sign      = "+" if chg >= 0 else ""
+            lines.append("• " + c["name"] + " (" + c["symbol"] + ")  Rank #" + str(rank) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_trending")],
+                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_market")]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "exec_stats":
+        fg = global_data = prices = None
+        for attempt in range(3):
+            if attempt > 0:
+                await asyncio.sleep(2)
+            fg          = get_fear_greed_stats()
+            time.sleep(0.5)
+            global_data = get_global_market()
+            time.sleep(0.5)
+            prices      = get_btc_eth_prices()
+            if fg and global_data and prices:
+                break
+        if not fg or not global_data or not prices:
+            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard())
+            return
+        text = format_stats_full(fg, global_data, prices)
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_stats")],
+                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_market")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "exec_sector_list":
+        lines = ["Sectoare disponibile:\n"]
+        kb    = []
+        for key, (_, label) in SECTORS.items():
+            kb.append([InlineKeyboardButton(label, callback_data="exec_sector:" + key)])
+        kb.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_market")])
+        await query.edit_message_text("\n".join(lines) + "\nAlege un sector:", reply_markup=InlineKeyboardMarkup(kb))
+
+    elif data.startswith("exec_sector:"):
+        key = data.split(":", 1)[1]
+        if key not in SECTORS:
+            await query.answer("Sector invalid.")
+            return
+        category_id, label = SECTORS[key]
+        coins = get_sector_coins(category_id)
+        if not coins:
+            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard())
+            return
+        lines = [label + " - Top " + str(len(coins)) + "\n"]
+        for c in coins:
+            chg       = c["change_24h"]
+            chg_emoji = "🟢" if chg >= 0 else "🔴"
+            sign      = "+" if chg >= 0 else ""
+            lines.append(c["symbol"] + " #" + str(c["rank"]) + "  " + fmt_price(c["price"]) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
+        keyboard = [[InlineKeyboardButton("🔄 Refresh",    callback_data="exec_sector:" + key)],
+                    [InlineKeyboardButton("⬅️ Sectoare",   callback_data="exec_sector_list")],
+                    [InlineKeyboardButton("⬅️ Inapoi",     callback_data="help_market")]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "exec_whales":
+        txs = get_whale_transactions()
+        if not txs:
+            await query.edit_message_text(t(uid, "no_whales"), reply_markup=back_keyboard())
+            return
+        lines = [t(uid, "whales_title") + "\n"]
+        for tx in txs[:8]:
+            val = fmt_large(tx["value_usd"])
+            if "note" in tx:
+                lines.append(tx["symbol"] + " - " + val + " - " + tx["note"])
+            else:
+                lines.append(tx["symbol"] + " - " + val + "\n  " + tx["from"] + " -> " + tx["to"])
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_whales")],
+                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_whales")]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data.startswith("exec_lang_"):
+        lang = data.split("_")[-1]
+        user = get_user(uid)
+        user["lang"] = lang
+        save_data()
+        msg = "Limba setata: Romana" if lang == "ro" else "Language set: English"
+        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_settings")]]
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data.startswith("exec_cur_"):
+        currency = data.split("_")[-1]
+        user = get_user(uid)
+        user["currency"] = currency
+        save_data()
+        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_settings")]]
+        await query.edit_message_text("Moneda setata: " + currency, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "help":
+        await query.edit_message_text("Alege o categorie:", reply_markup=help_main_keyboard())
 
     elif data == "help":
         await query.edit_message_text("Alege o categorie:", reply_markup=help_main_keyboard())
