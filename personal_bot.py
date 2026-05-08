@@ -31,7 +31,7 @@ from telegram.ext import (
 )
 
 # ─── CONFIG ────────────────────────────────────────────────────────────────────
-BOT_TOKEN      = os.environ.get("BOT_TOKEN", "8403967516:AAE2MGRsx0d_vDfDL_Janh9167DVptkOopY")
+BOT_TOKEN      = os.environ.get("BOT_TOKEN", "")
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 WHALE_API      = "https://api.whale-alert.io/v1/transactions"
 WHALE_API_KEY  = os.environ.get("WHALE_API_KEY", "")
