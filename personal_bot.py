@@ -1215,33 +1215,30 @@ async def button_callback(update, context):
     await query.answer()
     uid  = update.effective_user.id
     data = query.data
-    # ── Help menu ──────────────────────────────────────────────────────────────
-    if data == "help_back":
-        lang = get_user(uid).get("lang", "ro")
+    lang = get_user(uid).get("lang", "ro")
+    back = "⬅️ Inapoi" if lang == "ro" else "⬅️ Back"
+
+    # ── Help main menu ─────────────────────────────────────────────────────────
+    if data in ("help_back", "help"):
         label = "Alege o categorie:" if lang == "ro" else "Choose a category:"
         await query.edit_message_text(label, reply_markup=help_main_keyboard(lang))
-        return
 
-    if data in get_help_keyboards():
-        lang = get_user(uid).get("lang", "ro")
-        cat  = get_help_keyboards(lang)[data]
-        await query.edit_message_text(
-            cat["title"],
-            reply_markup=InlineKeyboardMarkup(cat["keyboard"]))
-        return
+    elif data in get_help_keyboards(lang):
+        cat = get_help_keyboards(lang)[data]
+        await query.edit_message_text(cat["title"], reply_markup=InlineKeyboardMarkup(cat["keyboard"]))
 
-    # ── Portfolio ──────────────────────────────────────────────────────────────
+    # ── Start menu shortcuts ───────────────────────────────────────────────────
     elif data == "portfolio":
         user = get_user(uid)
         if not user.get("portfolio"):
-            await query.edit_message_text(t(uid, "portfolio_empty"))
+            await query.edit_message_text(t(uid, "portfolio_empty"), reply_markup=back_keyboard(lang))
             return
         pf = calculate_portfolio(uid)
         if not pf:
-            await query.edit_message_text(t(uid, "no_data"))
+            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(lang))
             return
         currency = user.get("currency", "USD")
-        lines = ["Your Portfolio\n"]
+        lines = [("Your Portfolio" if lang == "en" else "Portofoliul Tau") + "\n"]
         for c in pf["coins"]:
             lines.append(
                 c["symbol"] + " x" + str(c["amount"]) + "\n"
@@ -1252,32 +1249,44 @@ async def button_callback(update, context):
             )
         lines.append("\nTOTAL VALUE: " + fmt_currency(pf["total_value"], currency))
         lines.append("TOTAL P&L:   " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
-        keyboard = [[InlineKeyboardButton("Refresh", callback_data="portfolio")]]
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="portfolio")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "watchlist":
         user = get_user(uid)
         if not user.get("watchlist"):
-            await query.edit_message_text(t(uid, "watchlist_empty"))
+            await query.edit_message_text(t(uid, "watchlist_empty"), reply_markup=back_keyboard(lang))
             return
-        lines = [tx(get_user(uid).get("lang","ro"), "Watchlist (24h)\n", "Watchlist (24h)\n")]
+        slugs = [resolve_slug(s) for s in user["watchlist"]]
+        prices_data = {}
+        try:
+            r = requests.get(COINGECKO_BASE + "/simple/price",
+                params={"ids": ",".join(slugs), "vs_currencies": "usd", "include_24hr_change": "true"},
+                timeout=10, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
+            if r.status_code == 200:
+                prices_data = r.json()
+        except Exception as e:
+            logger.error("watchlist batch: " + str(e))
+        header = "Watchlist (24h)\n"
+        lines = [header]
         for symbol in user["watchlist"]:
-            pd = get_price(resolve_slug(symbol))
-            time.sleep(0.3)
+            pd = prices_data.get(resolve_slug(symbol), {})
             if pd:
-                lines.append(symbol + ": " + fmt_price(pd["price"]) + " | " + fmt_pct(pd.get("change_24h", 0)))
-        keyboard = [[InlineKeyboardButton("Refresh", callback_data="watchlist")]]
+                lines.append(symbol + ": " + fmt_price(pd.get("usd", 0)) + " | " + fmt_pct(pd.get("usd_24h_change", 0)))
+            else:
+                lines.append(symbol + ": N/A")
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="watchlist")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "report":
         text = await generate_report(uid)
-        keyboard = [[InlineKeyboardButton("Refresh", callback_data="report")]]
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="report")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "whales":
         txs = get_whale_transactions()
         if not txs:
-            await query.edit_message_text(t(uid, "no_whales"))
+            await query.edit_message_text(t(uid, "no_whales"), reply_markup=back_keyboard(lang))
             return
         lines = [t(uid, "whales_title") + "\n"]
         for tx in txs[:8]:
@@ -1286,79 +1295,21 @@ async def button_callback(update, context):
                 lines.append(tx["symbol"] + " - " + val + " - " + tx["note"])
             else:
                 lines.append(tx["symbol"] + " - " + val + "\n  " + tx["from"] + " -> " + tx["to"])
-        keyboard = [[InlineKeyboardButton("Refresh", callback_data="whales")]]
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="whales")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
-    elif data == "trending":
-        if "trending" in _cache:
-            del _cache["trending"]
-        coins = get_trending_coins()
-        if not coins:
-            await query.edit_message_text("Nu s-au putut obtine datele.")
-            return
-        lines = ["Trending pe CoinGecko\n"]
-        for item in coins[:7]:
-            c         = item["item"]
-            rank      = c.get("market_cap_rank", "?")
-            chg       = c.get("change_24h", 0)
-            chg_emoji = "🟢" if chg >= 0 else "🔴"
-            sign      = "+" if chg >= 0 else ""
-            lines.append("• " + c["name"] + " (" + c["symbol"] + ")  Rank #" + str(rank) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
-        keyboard = [[InlineKeyboardButton("Refresh", callback_data="trending")]]
-        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data == "stats_full":
-        fg = global_data = prices = None
-        for attempt in range(3):
-            if attempt > 0:
-                await asyncio.sleep(2)
-            fg          = get_fear_greed_stats()
-            time.sleep(0.5)
-            global_data = get_global_market()
-            time.sleep(0.5)
-            prices      = get_btc_eth_prices()
-            if fg and global_data and prices:
-                break
-        if not fg or not global_data or not prices:
-            await query.edit_message_text("Nu s-au putut obtine datele.")
-            return
-        text = format_stats_full(fg, global_data, prices)
-        keyboard = [[InlineKeyboardButton("Refresh", callback_data="stats_full")]]
-        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data.startswith("sector_cb:"):
-        key = data.split(":", 1)[1]
-        if key not in SECTORS:
-            await query.answer("Sector invalid.")
-            return
-        category_id, label = SECTORS[key]
-        coins = get_sector_coins(category_id)
-        if not coins:
-            await query.edit_message_text("Nu s-au putut obtine datele.")
-            return
-        lines = [label + " - Top " + str(len(coins)) + "\n"]
-        for c in coins:
-            chg       = c["change_24h"]
-            chg_emoji = "🟢" if chg >= 0 else "🔴"
-            sign      = "+" if chg >= 0 else ""
-            lines.append(c["symbol"] + " #" + str(c["rank"]) + "  " + fmt_price(c["price"]) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
-        keyboard = [[InlineKeyboardButton("Refresh", callback_data="sector_cb:" + key)]]
-        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
-
-    # ── Exec callbacks from help menu ─────────────────────────────────────────
+    # ── Exec commands from help menu ───────────────────────────────────────────
     elif data == "exec_portfolio":
         user = get_user(uid)
         if not user.get("portfolio"):
-            await query.edit_message_text(
-                t(uid, "portfolio_empty"),
-                reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
+            await query.edit_message_text(t(uid, "portfolio_empty"), reply_markup=back_keyboard(lang))
             return
         pf = calculate_portfolio(uid)
         if not pf:
-            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
+            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(lang))
             return
         currency = user.get("currency", "USD")
-        lines = ["Your Portfolio\n"]
+        lines = [("Your Portfolio" if lang == "en" else "Portofoliul Tau") + "\n"]
         for c in pf["coins"]:
             lines.append(
                 c["symbol"] + " x" + str(c["amount"]) + "\n"
@@ -1370,17 +1321,17 @@ async def button_callback(update, context):
         lines.append("\nTOTAL VALUE: " + fmt_currency(pf["total_value"], currency))
         lines.append("TOTAL P&L:   " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_portfolio")],
-                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_portfolio")]]
+                    [InlineKeyboardButton(back, callback_data="help_portfolio")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_pnl":
         user = get_user(uid)
         if not user.get("portfolio"):
-            await query.edit_message_text(t(uid, "pnl_empty"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
+            await query.edit_message_text(t(uid, "pnl_empty"), reply_markup=back_keyboard(lang))
             return
         pf = calculate_portfolio(uid)
         if not pf:
-            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
+            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(lang))
             return
         currency = user.get("currency", "USD")
         lines = ["P&L Report\n"]
@@ -1391,15 +1342,15 @@ async def button_callback(update, context):
                 "  Buy: " + fmt_price(c["buy_price"]) + " -> Now: " + fmt_price(c["current_price"]) + "\n"
                 "  P&L: " + fmt_currency(c["pnl"], currency) + " (" + fmt_pct(c["pnl_pct"]) + ")\n"
             )
-        emoji = "🟢" if pf["total_pnl"] >= 0 else "🔴"
-        lines.append(emoji + " TOTAL: " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
-        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")]]
+        e2 = "🟢" if pf["total_pnl"] >= 0 else "🔴"
+        lines.append(e2 + " TOTAL: " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
+        keyboard = [[InlineKeyboardButton(back, callback_data="help_portfolio")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_risk":
         user = get_user(uid)
         if not user.get("portfolio"):
-            await query.edit_message_text(t(uid, "portfolio_empty"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
+            await query.edit_message_text(t(uid, "portfolio_empty"), reply_markup=back_keyboard(lang))
             return
         pf    = calculate_portfolio(uid)
         score, label, notes = calculate_risk_score(pf)
@@ -1407,44 +1358,33 @@ async def button_callback(update, context):
         lines = [t(uid, "risk_title") + "\n", "Score: " + str(score) + "/10 - " + label, "[" + bar + "]\n"]
         for note in notes:
             lines.append("- " + note)
-        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")]]
+        keyboard = [[InlineKeyboardButton(back, callback_data="help_portfolio")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_watchlist":
         user = get_user(uid)
         if not user.get("watchlist"):
-            await query.edit_message_text(t(uid, "watchlist_empty"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
+            await query.edit_message_text(t(uid, "watchlist_empty"), reply_markup=back_keyboard(lang))
             return
-        # Batch request pentru toate monedele din watchlist
         slugs = [resolve_slug(s) for s in user["watchlist"]]
         prices_data = {}
         try:
-            r = requests.get(
-                COINGECKO_BASE + "/simple/price",
-                params={
-                    "ids": ",".join(slugs),
-                    "vs_currencies": "usd",
-                    "include_24hr_change": "true",
-                },
-                timeout=10,
-                headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
-            )
+            r = requests.get(COINGECKO_BASE + "/simple/price",
+                params={"ids": ",".join(slugs), "vs_currencies": "usd", "include_24hr_change": "true"},
+                timeout=10, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
             if r.status_code == 200:
                 prices_data = r.json()
         except Exception as e:
-            logger.error("watchlist batch error: " + str(e))
-        lines = [tx(get_user(uid).get("lang","ro"), "Watchlist (24h)\n", "Watchlist (24h)\n")]
+            logger.error("watchlist batch: " + str(e))
+        lines = [("Watchlist (24h)" if lang == "en" else "Watchlist (24h)") + "\n"]
         for symbol in user["watchlist"]:
-            slug = resolve_slug(symbol)
-            pd   = prices_data.get(slug, {})
+            pd = prices_data.get(resolve_slug(symbol), {})
             if pd:
-                price  = pd.get("usd", 0)
-                change = pd.get("usd_24h_change", 0)
-                lines.append(symbol + ": " + fmt_price(price) + " | " + fmt_pct(change))
+                lines.append(symbol + ": " + fmt_price(pd.get("usd", 0)) + " | " + fmt_pct(pd.get("usd_24h_change", 0)))
             else:
                 lines.append(symbol + ": N/A")
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_watchlist")],
-                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_watchlist")]]
+                    [InlineKeyboardButton(back, callback_data="help_watchlist")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_alerts":
@@ -1453,22 +1393,22 @@ async def button_callback(update, context):
         ema_a  = alerts.get("ema", {})
         fear_a = alerts.get("fear")
         if not ema_a and not fear_a:
-            await query.edit_message_text(t(uid, "alerts_empty"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
+            await query.edit_message_text(t(uid, "alerts_empty"), reply_markup=back_keyboard(lang))
             return
-        lines = ["Your Alerts\n"]
+        lines = [("Your Alerts" if lang == "en" else "Alertele Tale") + "\n"]
         if ema_a:
-            lines.append("EMA Alerts:")
+            lines.append("EMA Alerts:" if lang == "en" else "Alerte EMA:")
             for key, info in ema_a.items():
                 lines.append("  " + info["symbol"] + " EMA" + str(info["period"]) + " DAILY (" + info["position"] + " EMA)")
         if fear_a:
-            lines.append("Fear & Greed Alert: < " + str(fear_a))
-        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_alerts")]]
+            lines.append(("Fear & Greed Alert: < " if lang == "en" else "Alerta Fear & Greed: < ") + str(fear_a))
+        keyboard = [[InlineKeyboardButton(back, callback_data="help_alerts")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_report":
         text = await generate_report(uid)
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_report")],
-                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_reports")]]
+                    [InlineKeyboardButton(back, callback_data="help_reports")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_trending":
@@ -1476,9 +1416,10 @@ async def button_callback(update, context):
             del _cache["trending"]
         coins = get_trending_coins()
         if not coins:
-            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
+            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(lang))
             return
-        lines = ["Trending pe CoinGecko\n"]
+        header = "Trending pe CoinGecko" if lang == "ro" else "Trending on CoinGecko"
+        lines = [header + "\n"]
         for item in coins[:7]:
             c         = item["item"]
             rank      = c.get("market_cap_rank", "?")
@@ -1487,7 +1428,7 @@ async def button_callback(update, context):
             sign      = "+" if chg >= 0 else ""
             lines.append("• " + c["name"] + " (" + c["symbol"] + ")  Rank #" + str(rank) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_trending")],
-                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_market")]]
+                    [InlineKeyboardButton(back, callback_data="help_market")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_stats":
@@ -1503,30 +1444,30 @@ async def button_callback(update, context):
             if fg and global_data and prices:
                 break
         if not fg or not global_data or not prices:
-            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
+            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(lang))
             return
         text = format_stats_full(fg, global_data, prices)
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_stats")],
-                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_market")]]
+                    [InlineKeyboardButton(back, callback_data="help_market")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_sector_list":
-        lines = ["Sectoare disponibile:\n"]
-        kb    = []
+        rows = []
         for key, (_, label) in SECTORS.items():
-            kb.append([InlineKeyboardButton(label, callback_data="exec_sector:" + key)])
-        kb.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_market")])
-        await query.edit_message_text("\n".join(lines) + tx(get_user(uid).get("lang","ro"), "\nAlege un sector:", "\nChoose a sector:"), reply_markup=InlineKeyboardMarkup(kb))
+            rows.append([InlineKeyboardButton(label, callback_data="exec_sector:" + key)])
+        rows.append([InlineKeyboardButton(back, callback_data="help_market")])
+        title = "Alege un sector:" if lang == "ro" else "Choose a sector:"
+        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("exec_sector:"):
         key = data.split(":", 1)[1]
         if key not in SECTORS:
-            await query.answer("Sector invalid.")
+            await query.answer("Invalid sector.")
             return
         category_id, label = SECTORS[key]
         coins = get_sector_coins(category_id)
         if not coins:
-            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
+            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(lang))
             return
         lines = [label + " - Top " + str(len(coins)) + "\n"]
         for c in coins:
@@ -1534,11 +1475,27 @@ async def button_callback(update, context):
             chg_emoji = "🟢" if chg >= 0 else "🔴"
             sign      = "+" if chg >= 0 else ""
             lines.append(c["symbol"] + " #" + str(c["rank"]) + "  " + fmt_price(c["price"]) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
-        keyboard = [[InlineKeyboardButton("🔄 Refresh",    callback_data="exec_sector:" + key)],
-                    [InlineKeyboardButton("⬅️ Sectoare",   callback_data="exec_sector_list")],
-                    [InlineKeyboardButton("⬅️ Inapoi",     callback_data="help_market")]]
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_sector:" + key)],
+                    [InlineKeyboardButton(back, callback_data="exec_sector_list")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
+    elif data == "exec_whales":
+        txs = get_whale_transactions()
+        if not txs:
+            await query.edit_message_text(t(uid, "no_whales"), reply_markup=back_keyboard(lang))
+            return
+        lines = [t(uid, "whales_title") + "\n"]
+        for tx in txs[:8]:
+            val = fmt_large(tx["value_usd"])
+            if "note" in tx:
+                lines.append(tx["symbol"] + " - " + val + " - " + tx["note"])
+            else:
+                lines.append(tx["symbol"] + " - " + val + "\n  " + tx["from"] + " -> " + tx["to"])
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_whales")],
+                    [InlineKeyboardButton(back, callback_data="help_whales")]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    # ── Watchlist add/remove ───────────────────────────────────────────────────
     elif data == "exec_wl_add_list":
         rows = []
         row  = []
@@ -1549,63 +1506,28 @@ async def button_callback(update, context):
                 row = []
         if row:
             rows.append(row)
-        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
-        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de adaugat la Watchlist:", "Choose coin to add to Watchlist:"),
-                                      reply_markup=InlineKeyboardMarkup(rows))
+        rows.append([InlineKeyboardButton(back, callback_data="help_watchlist")])
+        title = "Alege moneda de adaugat:" if lang == "ro" else "Choose coin to add:"
+        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
 
     elif data == "exec_wl_remove_list":
         user = get_user(uid)
         wl   = user.get("watchlist", [])
         if not wl:
-            await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Watchlist-ul tau este gol.", "Your watchlist is empty."),
-                                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")]]))
+            await query.edit_message_text(t(uid, "watchlist_empty"), reply_markup=back_keyboard(lang))
             return
         rows = []
         row  = []
-        for i, coin in enumerate(wl):
+        for coin in wl:
             row.append(InlineKeyboardButton(coin, callback_data="wl_remove:" + coin))
             if len(row) == 4:
                 rows.append(row)
                 row = []
         if row:
             rows.append(row)
-        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
-        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de sters din Watchlist:", "Choose coin to remove from Watchlist:"),
-                                      reply_markup=InlineKeyboardMarkup(rows))
-
-    elif data == "exec_pf_add_list":
-        rows = []
-        row  = []
-        for i, coin in enumerate(PREDEFINED_COINS):
-            row.append(InlineKeyboardButton(coin, callback_data="pf_add_pick:" + coin))
-            if len(row) == 4:
-                rows.append(row)
-                row = []
-        if row:
-            rows.append(row)
-        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")])
-        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de adaugat in Portofoliu:", "Choose coin to add to Portfolio:"),
-                                      reply_markup=InlineKeyboardMarkup(rows))
-
-    elif data == "exec_pf_remove_list":
-        user = get_user(uid)
-        pf   = user.get("portfolio", {})
-        if not pf:
-            await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Portofoliul tau este gol.", "Your portfolio is empty."),
-                                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")]]))
-            return
-        rows = []
-        row  = []
-        for i, coin in enumerate(pf.keys()):
-            row.append(InlineKeyboardButton(coin, callback_data="pf_remove:" + coin))
-            if len(row) == 4:
-                rows.append(row)
-                row = []
-        if row:
-            rows.append(row)
-        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")])
-        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de sters din Portofoliu:", "Choose coin to remove from Portfolio:"),
-                                      reply_markup=InlineKeyboardMarkup(rows))
+        rows.append([InlineKeyboardButton(back, callback_data="help_watchlist")])
+        title = "Alege moneda de sters:" if lang == "ro" else "Choose coin to remove:"
+        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("wl_add:"):
         coin = data.split(":", 1)[1]
@@ -1613,19 +1535,18 @@ async def button_callback(update, context):
         if coin not in user["watchlist"]:
             user["watchlist"].append(coin)
             save_data()
-        # Refresh list
         rows = []
         row  = []
-        for i, c in enumerate(PREDEFINED_COINS):
+        for c in PREDEFINED_COINS:
             row.append(InlineKeyboardButton(c, callback_data="wl_add:" + c))
             if len(row) == 4:
                 rows.append(row)
                 row = []
         if row:
             rows.append(row)
-        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
-        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de adaugat la Watchlist:", "Choose coin to add to Watchlist:"),
-                                      reply_markup=InlineKeyboardMarkup(rows))
+        rows.append([InlineKeyboardButton(back, callback_data="help_watchlist")])
+        title = ("Adaugat! Alege alta moneda:" if lang == "ro" else "Added! Choose another:") + " (" + coin + ")"
+        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("wl_remove:"):
         coin = data.split(":", 1)[1]
@@ -1635,27 +1556,62 @@ async def button_callback(update, context):
             save_data()
         wl = user.get("watchlist", [])
         if not wl:
-            await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Watchlist-ul tau este gol.", "Your watchlist is empty."),
-                                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")]]))
+            await query.edit_message_text(t(uid, "watchlist_empty"), reply_markup=back_keyboard(lang))
             return
         rows = []
         row  = []
-        for i, c in enumerate(wl):
+        for c in wl:
             row.append(InlineKeyboardButton(c, callback_data="wl_remove:" + c))
             if len(row) == 4:
                 rows.append(row)
                 row = []
         if row:
             rows.append(row)
-        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
-        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de sters din Watchlist:", "Choose coin to remove from Watchlist:"),
-                                      reply_markup=InlineKeyboardMarkup(rows))
+        rows.append([InlineKeyboardButton(back, callback_data="help_watchlist")])
+        title = "Alege moneda de sters:" if lang == "ro" else "Choose coin to remove:"
+        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
+
+    # ── Portfolio add/remove ───────────────────────────────────────────────────
+    elif data == "exec_pf_add_list":
+        rows = []
+        row  = []
+        for coin in PREDEFINED_COINS:
+            row.append(InlineKeyboardButton(coin, callback_data="pf_add_pick:" + coin))
+            if len(row) == 4:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([InlineKeyboardButton(back, callback_data="help_portfolio")])
+        title = "Alege moneda de adaugat:" if lang == "ro" else "Choose coin to add:"
+        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
+
+    elif data == "exec_pf_remove_list":
+        user = get_user(uid)
+        pf   = user.get("portfolio", {})
+        if not pf:
+            await query.edit_message_text(t(uid, "portfolio_empty"), reply_markup=back_keyboard(lang))
+            return
+        rows = []
+        row  = []
+        for coin in pf.keys():
+            row.append(InlineKeyboardButton(coin, callback_data="pf_remove:" + coin))
+            if len(row) == 4:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([InlineKeyboardButton(back, callback_data="help_portfolio")])
+        title = "Alege moneda de sters:" if lang == "ro" else "Choose coin to remove:"
+        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("pf_add_pick:"):
         coin = data.split(":", 1)[1]
         _user_state[uid] = "pf_add:" + coin
-        await query.message.reply_text(
-            tx(get_user(uid).get("lang","ro"), "Scrie cantitatea si pretul pentru " + coin + " (ex: 0.5 45000):", "Enter amount and buy price for " + coin + " (e.g. 0.5 45000):"),
+        prompt = ("Scrie cantitatea si pretul pentru " + coin + " (ex: 0.5 45000):"
+                  if lang == "ro" else
+                  "Enter amount and buy price for " + coin + " (e.g. 0.5 45000):")
+        await query.message.reply_text(prompt,
             reply_markup=ForceReply(selective=True, input_field_placeholder="ex: 0.5 45000"))
 
     elif data.startswith("pf_remove:"):
@@ -1666,146 +1622,185 @@ async def button_callback(update, context):
             save_data()
         pf = user.get("portfolio", {})
         if not pf:
-            await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Portofoliul tau este gol.", "Your portfolio is empty."),
-                                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")]]))
+            await query.edit_message_text(t(uid, "portfolio_empty"), reply_markup=back_keyboard(lang))
             return
         rows = []
         row  = []
-        for i, c in enumerate(pf.keys()):
+        for c in pf.keys():
             row.append(InlineKeyboardButton(c, callback_data="pf_remove:" + c))
             if len(row) == 4:
                 rows.append(row)
                 row = []
         if row:
             rows.append(row)
-        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")])
-        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de sters din Portofoliu:", "Choose coin to remove from Portfolio:"),
-                                      reply_markup=InlineKeyboardMarkup(rows))
+        rows.append([InlineKeyboardButton(back, callback_data="help_portfolio")])
+        title = "Alege moneda de sters:" if lang == "ro" else "Choose coin to remove:"
+        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
 
+    # ── Alerts setup ──────────────────────────────────────────────────────────
     elif data == "exec_alert_ema_menu":
-        # Show coin list for EMA alert
         rows = []
         row  = []
-        for i, coin in enumerate(PREDEFINED_COINS):
+        for coin in PREDEFINED_COINS:
             row.append(InlineKeyboardButton(coin, callback_data="alert_ema_coin:" + coin))
             if len(row) == 4:
                 rows.append(row)
                 row = []
         if row:
             rows.append(row)
-        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_alerts")])
-        await query.edit_message_text(
-            tx(get_user(uid).get("lang","ro"), "Alege moneda pentru alerta EMA200 Daily:", "Choose coin for EMA200 Daily alert:"),
-            reply_markup=InlineKeyboardMarkup(rows))
+        rows.append([InlineKeyboardButton(back, callback_data="help_alerts")])
+        title = "Alege moneda pentru alerta EMA200 Daily:" if lang == "ro" else "Choose coin for EMA200 Daily alert:"
+        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("alert_ema_coin:"):
         coin = data.split(":", 1)[1]
         user = get_user(uid)
         slug  = resolve_slug(coin)
-        period = 200
-        # Calculate EMA
-        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Se calculeaza EMA200 pentru " + coin + "...", "Calculating EMA200 for " + coin + "..."))
-        ema   = get_ema(slug, period, "daily")
+        msg_calc = "Se calculeaza EMA200 pentru " + coin + "..." if lang == "ro" else "Calculating EMA200 for " + coin + "..."
+        await query.edit_message_text(msg_calc)
+        ema   = get_ema(slug, 200, "daily")
         price = get_current_price_simple(slug)
         if ema is None:
-            keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="exec_alert_ema_menu")]]
-            await query.edit_message_text(
-                "Nu s-a putut calcula EMA pentru " + coin + ". Incearca alt simbol.",
-                reply_markup=InlineKeyboardMarkup(keyboard))
+            keyboard = [[InlineKeyboardButton(back, callback_data="exec_alert_ema_menu")]]
+            err = ("Nu s-a putut calcula EMA pentru " + coin + "." if lang == "ro"
+                   else "Could not calculate EMA for " + coin + ".")
+            await query.edit_message_text(err, reply_markup=InlineKeyboardMarkup(keyboard))
             return
         position  = "above" if (price and price > ema) else "below"
-        alert_key = coin + ":daily:" + str(period)
+        alert_key = coin + ":daily:200"
         if "ema" not in user["alerts"]:
             user["alerts"]["ema"] = {}
         user["alerts"]["ema"][alert_key] = {
             "symbol": coin, "slug": slug, "timeframe": "daily",
-            "period": period, "position": position,
+            "period": 200, "position": position,
         }
         save_data()
-        pos_text = "DEASUPRA" if position == "above" else "SUB"
-        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_alerts")]]
-        msg = (
-            "Alerta EMA200 setata pentru " + coin + "!\n\n"
-            + "EMA200: " + fmt_price(ema) + "\n"
-            + "Pret curent: " + (fmt_price(price) if price else "N/A") + "\n"
-            + "Pozitie: " + pos_text + " EMA\n\n"
-            + "Vei fi notificat cand pretul incruciseaza EMA200."
-        )
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        pos_text = ("DEASUPRA" if position == "above" else "SUB") if lang == "ro" else ("ABOVE" if position == "above" else "BELOW")
+        keyboard = [[InlineKeyboardButton(back, callback_data="help_alerts")]]
+        msg_ok = ("Alerta EMA200 setata pentru " + coin + "!\n\n"
+                  + "EMA200: " + fmt_price(ema) + "\n"
+                  + "Pret curent: " + (fmt_price(price) if price else "N/A") + "\n"
+                  + "Pozitie: " + pos_text + " EMA\n\n"
+                  + "Vei fi notificat cand pretul incruciseaza EMA200."
+                  if lang == "ro" else
+                  "EMA200 alert set for " + coin + "!\n\n"
+                  + "EMA200: " + fmt_price(ema) + "\n"
+                  + "Current price: " + (fmt_price(price) if price else "N/A") + "\n"
+                  + "Position: " + pos_text + " EMA\n\n"
+                  + "You will be notified when price crosses EMA200.")
+        await query.edit_message_text(msg_ok, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_alert_fear_menu":
         rows = [
-            [InlineKeyboardButton("10",  callback_data="alert_fear_set:10"),
-             InlineKeyboardButton("15",  callback_data="alert_fear_set:15"),
-             InlineKeyboardButton("20",  callback_data="alert_fear_set:20"),
-             InlineKeyboardButton("25",  callback_data="alert_fear_set:25")],
-            [InlineKeyboardButton("30",  callback_data="alert_fear_set:30"),
-             InlineKeyboardButton("35",  callback_data="alert_fear_set:35"),
-             InlineKeyboardButton("40",  callback_data="alert_fear_set:40"),
-             InlineKeyboardButton("45",  callback_data="alert_fear_set:45")],
-            [InlineKeyboardButton("⬅️ Inapoi", callback_data="help_alerts")],
+            [InlineKeyboardButton("10", callback_data="alert_fear_set:10"),
+             InlineKeyboardButton("15", callback_data="alert_fear_set:15"),
+             InlineKeyboardButton("20", callback_data="alert_fear_set:20"),
+             InlineKeyboardButton("25", callback_data="alert_fear_set:25")],
+            [InlineKeyboardButton("30", callback_data="alert_fear_set:30"),
+             InlineKeyboardButton("35", callback_data="alert_fear_set:35"),
+             InlineKeyboardButton("40", callback_data="alert_fear_set:40"),
+             InlineKeyboardButton("45", callback_data="alert_fear_set:45")],
+            [InlineKeyboardButton(back, callback_data="help_alerts")],
         ]
         fg = get_fear_greed()
-        current = "Fear & Greed curent: " + str(fg["value"]) + "/100" if fg else ""
-        msg2 = tx(get_user(uid).get("lang","ro"), "Alege pragul pentru alerta Fear & Greed:\n(primesti alerta cand scade sub valoarea aleasa)\n\n", "Choose Fear & Greed alert threshold:\n(you get alerted when it drops below)\n\n") + current
-        await query.edit_message_text(msg2, reply_markup=InlineKeyboardMarkup(rows))
+        current = (("Fear & Greed curent: " if lang == "ro" else "Current Fear & Greed: ")
+                   + str(fg["value"]) + "/100") if fg else ""
+        title = ("Alege pragul pentru alerta Fear & Greed:\n(primesti alerta cand scade sub valoarea aleasa)\n\n"
+                 if lang == "ro" else
+                 "Choose Fear & Greed alert threshold:\n(you get alerted when it drops below)\n\n") + current
+        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("alert_fear_set:"):
         threshold = float(data.split(":", 1)[1])
         user = get_user(uid)
         user["alerts"]["fear"] = threshold
         save_data()
-        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_alerts")]]
-        msg3 = "Alerta Fear & Greed setata!\n\nVei fi notificat cand Fear & Greed scade sub " + str(int(threshold)) + "."
-        await query.edit_message_text(msg3, reply_markup=InlineKeyboardMarkup(keyboard))
+        keyboard = [[InlineKeyboardButton(back, callback_data="help_alerts")]]
+        msg_fear = ("Alerta Fear & Greed setata!\n\nVei fi notificat cand Fear & Greed scade sub " + str(int(threshold)) + "."
+                    if lang == "ro" else
+                    "Fear & Greed alert set!\n\nYou will be notified when Fear & Greed drops below " + str(int(threshold)) + ".")
+        await query.edit_message_text(msg_fear, reply_markup=InlineKeyboardMarkup(keyboard))
 
-    elif data == "exec_whales":
-        txs = get_whale_transactions()
-        if not txs:
-            await query.edit_message_text(t(uid, "no_whales"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
-            return
-        lines = [t(uid, "whales_title") + "\n"]
-        for tx in txs[:8]:
-            val = fmt_large(tx["value_usd"])
-            if "note" in tx:
-                lines.append(tx["symbol"] + " - " + val + " - " + tx["note"])
-            else:
-                lines.append(tx["symbol"] + " - " + val + "\n  " + tx["from"] + " -> " + tx["to"])
-        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_whales")],
-                    [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_whales")]]
-        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
-
+    # ── Settings ───────────────────────────────────────────────────────────────
     elif data.startswith("exec_lang_"):
-        lang = data.split("_")[-1]
+        new_lang = data.split("_")[-1]
         user = get_user(uid)
-        user["lang"] = lang
+        user["lang"] = new_lang
         save_data()
-        msg  = "Limba setata: Romana" if lang == "ro" else "Language set: English"
-        back = "⬅️ Inapoi" if lang == "ro" else "⬅️ Back"
-        keyboard = [[InlineKeyboardButton(back, callback_data="help_settings")]]
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        new_back = "⬅️ Inapoi" if new_lang == "ro" else "⬅️ Back"
+        msg_lang = "Limba setata: Romana" if new_lang == "ro" else "Language set: English"
+        keyboard = [[InlineKeyboardButton(new_back, callback_data="help_settings")]]
+        await query.edit_message_text(msg_lang, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data.startswith("exec_cur_"):
         currency = data.split("_")[-1]
         user = get_user(uid)
         user["currency"] = currency
         save_data()
-        # Sterge cache-ul pentru ratele de schimb
         for key in list(_cache.keys()):
             if key.startswith("rate:"):
                 del _cache[key]
-        lang  = user.get("lang", "ro")
-        msg   = ("Moneda setata: " if lang == "ro" else "Currency set: ") + currency
-        back  = "⬅️ Inapoi" if lang == "ro" else "⬅️ Back"
+        msg_cur = ("Moneda setata: " if lang == "ro" else "Currency set: ") + currency
         keyboard = [[InlineKeyboardButton(back, callback_data="help_settings")]]
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.edit_message_text(msg_cur, reply_markup=InlineKeyboardMarkup(keyboard))
 
-    elif data == "help":
-        lang = get_user(uid).get("lang", "ro")
-        label = "Alege o categorie:" if lang == "ro" else "Choose a category:"
-        await query.edit_message_text(label, reply_markup=help_main_keyboard(lang))
+    # ── Stat/Sector refreshes (from /stats and /sector commands) ──────────────
+    elif data == "stats_full":
+        fg = global_data = prices = None
+        for attempt in range(3):
+            if attempt > 0:
+                await asyncio.sleep(2)
+            fg          = get_fear_greed_stats()
+            time.sleep(0.5)
+            global_data = get_global_market()
+            time.sleep(0.5)
+            prices      = get_btc_eth_prices()
+            if fg and global_data and prices:
+                break
+        if not fg or not global_data or not prices:
+            await query.edit_message_text(t(uid, "no_data"))
+            return
+        text = format_stats_full(fg, global_data, prices)
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="stats_full")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
-# ─── BACKGROUND JOBS ───────────────────────────────────────────────────────────
+    elif data == "trending":
+        if "trending" in _cache:
+            del _cache["trending"]
+        coins = get_trending_coins()
+        if not coins:
+            await query.edit_message_text(t(uid, "no_data"))
+            return
+        lines = [("Trending pe CoinGecko" if lang == "ro" else "Trending on CoinGecko") + "\n"]
+        for item in coins[:7]:
+            c         = item["item"]
+            rank      = c.get("market_cap_rank", "?")
+            chg       = c.get("change_24h", 0)
+            chg_emoji = "🟢" if chg >= 0 else "🔴"
+            sign      = "+" if chg >= 0 else ""
+            lines.append("• " + c["name"] + " (" + c["symbol"] + ")  Rank #" + str(rank) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="trending")]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data.startswith("sector_cb:"):
+        key = data.split(":", 1)[1]
+        if key not in SECTORS:
+            await query.answer("Invalid sector.")
+            return
+        category_id, label = SECTORS[key]
+        coins = get_sector_coins(category_id)
+        if not coins:
+            await query.edit_message_text(t(uid, "no_data"))
+            return
+        lines = [label + " - Top " + str(len(coins)) + "\n"]
+        for c in coins:
+            chg       = c["change_24h"]
+            chg_emoji = "🟢" if chg >= 0 else "🔴"
+            sign      = "+" if chg >= 0 else ""
+            lines.append(c["symbol"] + " #" + str(c["rank"]) + "  " + fmt_price(c["price"]) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
+        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="sector_cb:" + key)]]
+        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
+
 
 async def check_technical_alerts(context):
     fg = get_fear_greed(fresh=True)
