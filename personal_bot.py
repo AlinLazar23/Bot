@@ -607,12 +607,11 @@ def format_stats_full(fg, global_data, prices, lang):
             "OVERVIEW PIATA\n"
             "BTC:  " + fmt_price(prices.get("btc_price", 0)) + "  " + btc_a + " " + "{:.1f}%".format(abs(btc_chg)) + "\n"
             "ETH:  " + fmt_price(prices.get("eth_price", 0)) + "  " + eth_a + " " + "{:.1f}%".format(abs(prices.get("eth_change", 0))) + "\n"
-            "Mkt Cap: " + fmt_large(global_data.get("total_market_cap", 0)) + "  " + cap_a + " " + "{:.1f}%".format(abs(cap_chg)) + "\n"
+            "Market Cap: " + fmt_large(global_data.get("total_market_cap", 0)) + "  " + cap_a + " " + "{:.1f}%".format(abs(cap_chg)) + "\n"
             "Volum 24h: " + fmt_large(global_data.get("total_volume_24h", 0)) + "\n"
             "BTC Dominance: " + str(global_data.get("btc_dominance", 0)) + "%\n"
             "ETH Dominance: " + str(global_data.get("eth_dominance", 0)) + "%\n\n"
             "MARKET SCORE: " + str(score) + "/10 - " + slabel + "\n"
-            "[" + score_bar + "]\n"
             "Bazat pe: sentiment + trend + volum + dominance"
         )
     else:
