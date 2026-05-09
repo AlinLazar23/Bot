@@ -952,11 +952,8 @@ async def cmd_portfolio(update, context):
             c["symbol"] + " x" + str(c["amount"]) + "\n"
             "  Value:  " + fmt_currency(c["current_value"], currency) + "\n"
             "  Price:  " + fmt_price(c["current_price"]) + "\n"
-            "  24h:    " + fmt_pct(c["change_24h"]) + "\n"
-            "  P&L:    " + fmt_currency(c["pnl"], currency) + " (" + fmt_pct(c["pnl_pct"]) + ")\n"
+            "  24h:    " + fmt_pct(c["change_24h"]) + "\n"  
         )
-    lines.append("\nTOTAL VALUE: " + fmt_currency(pf["total_value"], currency))
-    lines.append("TOTAL P&L:   " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
     keyboard = [[InlineKeyboardButton("Refresh", callback_data="portfolio")]]
     await update.message.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
