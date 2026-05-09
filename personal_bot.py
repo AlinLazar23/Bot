@@ -31,7 +31,7 @@ from telegram.ext import (
 )
 
 # ─── CONFIG ────────────────────────────────────────────────────────────────────
-BOT_TOKEN      = os.environ.get("BOT_TOKEN", "")
+BOT_TOKEN      = os.environ.get("BOT_TOKEN", "8403967516:AAE2MGRsx0d_vDfDL_Janh9167DVptkOopY")
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 WHALE_API      = "https://api.whale-alert.io/v1/transactions"
 WHALE_API_KEY  = os.environ.get("WHALE_API_KEY", "")
@@ -731,17 +731,21 @@ HELP_KEYBOARDS = {
     "help_portfolio": {
         "title": "📁 Portofoliu",
         "keyboard": [
-            [InlineKeyboardButton("📊 Vezi Portofoliu",  callback_data="exec_portfolio")],
-            [InlineKeyboardButton("📈 P&L Report",       callback_data="exec_pnl")],
-            [InlineKeyboardButton("⚠️ Scor de Risc",     callback_data="exec_risk")],
-            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
+            [InlineKeyboardButton("📊 Vezi Portofoliu",      callback_data="exec_portfolio")],
+            [InlineKeyboardButton("📈 P&L Report",           callback_data="exec_pnl")],
+            [InlineKeyboardButton("⚠️ Scor de Risc",         callback_data="exec_risk")],
+            [InlineKeyboardButton("➕ Adauga Moneda",         switch_inline_query_current_chat="/portfolio add ")],
+            [InlineKeyboardButton("➖ Sterge Moneda",         switch_inline_query_current_chat="/portfolio remove ")],
+            [InlineKeyboardButton("⬅️ Inapoi",               callback_data="help_back")],
         ]
     },
     "help_watchlist": {
         "title": "👁 Watchlist",
         "keyboard": [
-            [InlineKeyboardButton("👁 Vezi Watchlist",   callback_data="exec_watchlist")],
-            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
+            [InlineKeyboardButton("👁 Vezi Watchlist",      callback_data="exec_watchlist")],
+            [InlineKeyboardButton("➕ Adauga Moneda",       switch_inline_query_current_chat="/watchlist add ")],
+            [InlineKeyboardButton("➖ Sterge Moneda",       switch_inline_query_current_chat="/watchlist remove ")],
+            [InlineKeyboardButton("⬅️ Inapoi",              callback_data="help_back")],
         ]
     },
     "help_alerts": {
@@ -830,7 +834,11 @@ async def cmd_portfolio(update, context):
             return
         user["portfolio"][symbol] = {"slug": resolve_slug(symbol), "amount": amount, "buy_price": buy_price}
         save_data()
-        await update.message.reply_text(t(uid, "portfolio_added", symbol, amount, fmt_price(buy_price)))
+        # Sterge mesajul utilizatorului si nu trimite raspuns
+        try:
+            await update.message.delete()
+        except Exception:
+            pass
         return
 
     if args and args[0].lower() == "remove":
@@ -841,9 +849,15 @@ async def cmd_portfolio(update, context):
         if symbol in user["portfolio"]:
             del user["portfolio"][symbol]
             save_data()
-            await update.message.reply_text(t(uid, "portfolio_removed", symbol))
+            try:
+                await update.message.delete()
+            except Exception:
+                pass
         else:
-            await update.message.reply_text(t(uid, "portfolio_not_found", symbol))
+            try:
+                await update.message.delete()
+            except Exception:
+                pass
         return
 
     if not user.get("portfolio"):
@@ -907,7 +921,10 @@ async def cmd_watchlist(update, context):
         if symbol not in user["watchlist"]:
             user["watchlist"].append(symbol)
             save_data()
-        await update.message.reply_text(t(uid, "watchlist_added", symbol))
+        try:
+            await update.message.delete()
+        except Exception:
+            pass
         return
 
     if args and args[0].lower() == "remove":
@@ -918,7 +935,10 @@ async def cmd_watchlist(update, context):
         if symbol in user["watchlist"]:
             user["watchlist"].remove(symbol)
             save_data()
-        await update.message.reply_text(t(uid, "watchlist_removed", symbol))
+        try:
+            await update.message.delete()
+        except Exception:
+            pass
         return
 
     if not user.get("watchlist"):
