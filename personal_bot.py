@@ -149,7 +149,6 @@ def get_user(uid):
 # ─── CACHE ─────────────────────────────────────────────────────────────────────
 _cache = {}
 CACHE_TTL = 180
-
 CACHE_TTL_STATS = 600  # 10 min pentru stats
 
 # State pentru ForceReply
@@ -895,6 +894,7 @@ async def cmd_start(update, context):
     await update.message.reply_text(t(uid, "welcome"), reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def cmd_help(update, context):
+    uid  = update.effective_user.id
     lang = get_user(uid).get("lang", "ro")
     await update.message.reply_text("Alege o categorie:" if lang == "ro" else "Choose a category:", reply_markup=help_main_keyboard(lang))
 
@@ -1484,17 +1484,9 @@ async def button_callback(update, context):
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_stats":
-        fg = global_data = prices = None
-        for attempt in range(3):
-            if attempt > 0:
-                await asyncio.sleep(2)
-            fg          = get_fear_greed_stats()
-            time.sleep(0.5)
-            global_data = get_global_market()
-            time.sleep(0.5)
-            prices      = get_btc_eth_prices()
-            if fg and global_data and prices:
-                break
+        fg          = get_fear_greed_stats()
+        global_data = get_global_market()
+        prices      = get_btc_eth_prices()
         if not fg or not global_data or not prices:
             await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(lang))
             return
