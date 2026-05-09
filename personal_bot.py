@@ -1626,42 +1626,29 @@ async def handle_force_reply(update, context):
         if symbol not in user["watchlist"]:
             user["watchlist"].append(symbol)
             save_data()
-        await update.message.reply_text(symbol + " adaugat in Watchlist!")
 
     elif state == "wl_remove":
         symbol = text.upper()
         if symbol in user["watchlist"]:
             user["watchlist"].remove(symbol)
             save_data()
-            await update.message.reply_text(symbol + " sters din Watchlist!")
-        else:
-            await update.message.reply_text(symbol + " nu este in Watchlist.")
 
     elif state == "pf_add":
         parts = text.split()
-        if len(parts) < 1:
-            await update.message.reply_text("Format invalid. Ex: BTC 0.5 45000")
-            return
-        symbol    = parts[0].upper()
-        amount    = float(parts[1]) if len(parts) > 1 else 0
-        buy_price = float(parts[2]) if len(parts) > 2 else 0
-        user["portfolio"][symbol] = {
-            "slug": resolve_slug(symbol), "amount": amount, "buy_price": buy_price,
-        }
-        save_data()
-        await update.message.reply_text(
-            symbol + " adaugat in Portofoliu!\n"
-            "Cantitate: " + str(amount) + "\n"
-            "Pret cumparare: " + fmt_price(buy_price))
+        if len(parts) >= 1:
+            symbol    = parts[0].upper()
+            amount    = float(parts[1]) if len(parts) > 1 else 0
+            buy_price = float(parts[2]) if len(parts) > 2 else 0
+            user["portfolio"][symbol] = {
+                "slug": resolve_slug(symbol), "amount": amount, "buy_price": buy_price,
+            }
+            save_data()
 
     elif state == "pf_remove":
         symbol = text.upper()
         if symbol in user["portfolio"]:
             del user["portfolio"][symbol]
             save_data()
-            await update.message.reply_text(symbol + " sters din Portofoliu!")
-        else:
-            await update.message.reply_text(symbol + " nu este in Portofoliu.")
 
 # ─── MAIN ──────────────────────────────────────────────────────────────────────
 
