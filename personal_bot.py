@@ -767,8 +767,10 @@ HELP_KEYBOARDS = {
     "help_alerts": {
         "title": "🔔 Alerte",
         "keyboard": [
-            [InlineKeyboardButton("🔔 Alertele Mele",    callback_data="exec_alerts")],
-            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
+            [InlineKeyboardButton("🔔 Alertele Mele",        callback_data="exec_alerts")],
+            [InlineKeyboardButton("📈 Seteaza Alerta EMA",   callback_data="exec_alert_ema_menu")],
+            [InlineKeyboardButton("😱 Seteaza Alerta Fear",  callback_data="exec_alert_fear_menu")],
+            [InlineKeyboardButton("⬅️ Inapoi",               callback_data="help_back")],
         ]
     },
     "help_reports": {
@@ -1662,6 +1664,83 @@ async def button_callback(update, context):
         rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")])
         await query.edit_message_text("Alege moneda de sters din Portofoliu:",
                                       reply_markup=InlineKeyboardMarkup(rows))
+
+    elif data == "exec_alert_ema_menu":
+        # Show coin list for EMA alert
+        rows = []
+        row  = []
+        for i, coin in enumerate(PREDEFINED_COINS):
+            row.append(InlineKeyboardButton(coin, callback_data="alert_ema_coin:" + coin))
+            if len(row) == 4:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_alerts")])
+        await query.edit_message_text(
+            "Alege moneda pentru alerta EMA200 Daily:",
+            reply_markup=InlineKeyboardMarkup(rows))
+
+    elif data.startswith("alert_ema_coin:"):
+        coin = data.split(":", 1)[1]
+        user = get_user(uid)
+        slug  = resolve_slug(coin)
+        period = 200
+        # Calculate EMA
+        await query.edit_message_text("Se calculeaza EMA200 pentru " + coin + "...")
+        ema   = get_ema(slug, period, "daily")
+        price = get_current_price_simple(slug)
+        if ema is None:
+            keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="exec_alert_ema_menu")]]
+            await query.edit_message_text(
+                "Nu s-a putut calcula EMA pentru " + coin + ". Incearca alt simbol.",
+                reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+        position  = "above" if (price and price > ema) else "below"
+        alert_key = coin + ":daily:" + str(period)
+        if "ema" not in user["alerts"]:
+            user["alerts"]["ema"] = {}
+        user["alerts"]["ema"][alert_key] = {
+            "symbol": coin, "slug": slug, "timeframe": "daily",
+            "period": period, "position": position,
+        }
+        save_data()
+        pos_text = "DEASUPRA" if position == "above" else "SUB"
+        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_alerts")]]
+        msg = (
+            "Alerta EMA200 setata pentru " + coin + "!\n\n"
+            + "EMA200: " + fmt_price(ema) + "\n"
+            + "Pret curent: " + (fmt_price(price) if price else "N/A") + "\n"
+            + "Pozitie: " + pos_text + " EMA\n\n"
+            + "Vei fi notificat cand pretul incruciseaza EMA200."
+        )
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "exec_alert_fear_menu":
+        rows = [
+            [InlineKeyboardButton("10",  callback_data="alert_fear_set:10"),
+             InlineKeyboardButton("15",  callback_data="alert_fear_set:15"),
+             InlineKeyboardButton("20",  callback_data="alert_fear_set:20"),
+             InlineKeyboardButton("25",  callback_data="alert_fear_set:25")],
+            [InlineKeyboardButton("30",  callback_data="alert_fear_set:30"),
+             InlineKeyboardButton("35",  callback_data="alert_fear_set:35"),
+             InlineKeyboardButton("40",  callback_data="alert_fear_set:40"),
+             InlineKeyboardButton("45",  callback_data="alert_fear_set:45")],
+            [InlineKeyboardButton("⬅️ Inapoi", callback_data="help_alerts")],
+        ]
+        fg = get_fear_greed()
+        current = "Fear & Greed curent: " + str(fg["value"]) + "/100" if fg else ""
+        msg2 = "Alege pragul pentru alerta Fear & Greed:\n(primesti alerta cand scade sub valoarea aleasa)\n\n" + current
+        await query.edit_message_text(msg2, reply_markup=InlineKeyboardMarkup(rows))
+
+    elif data.startswith("alert_fear_set:"):
+        threshold = float(data.split(":", 1)[1])
+        user = get_user(uid)
+        user["alerts"]["fear"] = threshold
+        save_data()
+        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_alerts")]]
+        msg3 = "Alerta Fear & Greed setata!\n\nVei fi notificat cand Fear & Greed scade sub " + str(int(threshold)) + "."
+        await query.edit_message_text(msg3, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_whales":
         txs = get_whale_transactions()
