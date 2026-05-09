@@ -946,12 +946,31 @@ async def cmd_watchlist(update, context):
         return
 
     await update.message.reply_text(t(uid, "loading"))
+    slugs = [resolve_slug(s) for s in user["watchlist"]]
+    prices_data = {}
+    try:
+        r = requests.get(
+            COINGECKO_BASE + "/simple/price",
+            params={
+                "ids": ",".join(slugs),
+                "vs_currencies": "usd",
+                "include_24hr_change": "true",
+            },
+            timeout=10,
+            headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
+        )
+        if r.status_code == 200:
+            prices_data = r.json()
+    except Exception as e:
+        logger.error("watchlist batch error: " + str(e))
     lines = ["Watchlist\n"]
     for symbol in user["watchlist"]:
-        pd = get_price(resolve_slug(symbol))
-        time.sleep(0.3)
+        slug = resolve_slug(symbol)
+        pd   = prices_data.get(slug, {})
         if pd:
-            lines.append(symbol + ": " + fmt_price(pd["price"]) + "\n  24h: " + fmt_pct(pd.get("change_24h", 0)) + "\n")
+            price  = pd.get("usd", 0)
+            change = pd.get("usd_24h_change", 0)
+            lines.append(symbol + ": " + fmt_price(price) + "\n  24h: " + fmt_pct(change) + "\n")
         else:
             lines.append(symbol + ": N/A\n")
     keyboard = [[InlineKeyboardButton("Refresh", callback_data="watchlist")]]
@@ -1375,12 +1394,34 @@ async def button_callback(update, context):
         if not user.get("watchlist"):
             await query.edit_message_text(t(uid, "watchlist_empty"), reply_markup=back_keyboard())
             return
+        # Batch request pentru toate monedele din watchlist
+        slugs = [resolve_slug(s) for s in user["watchlist"]]
+        prices_data = {}
+        try:
+            r = requests.get(
+                COINGECKO_BASE + "/simple/price",
+                params={
+                    "ids": ",".join(slugs),
+                    "vs_currencies": "usd",
+                    "include_24hr_change": "true",
+                },
+                timeout=10,
+                headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
+            )
+            if r.status_code == 200:
+                prices_data = r.json()
+        except Exception as e:
+            logger.error("watchlist batch error: " + str(e))
         lines = ["Watchlist\n"]
         for symbol in user["watchlist"]:
-            pd = get_price(resolve_slug(symbol))
-            time.sleep(0.3)
+            slug = resolve_slug(symbol)
+            pd   = prices_data.get(slug, {})
             if pd:
-                lines.append(symbol + ": " + fmt_price(pd["price"]) + " | " + fmt_pct(pd.get("change_24h", 0)))
+                price  = pd.get("usd", 0)
+                change = pd.get("usd_24h_change", 0)
+                lines.append(symbol + ": " + fmt_price(price) + " | " + fmt_pct(change))
+            else:
+                lines.append(symbol + ": N/A")
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_watchlist")],
                     [InlineKeyboardButton("⬅️ Inapoi",  callback_data="help_watchlist")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
