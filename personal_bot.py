@@ -1293,10 +1293,7 @@ async def button_callback(update, context):
                 "  Value:  " + fmt_currency(c["current_value"], currency) + "\n"
                 "  Price:  " + fmt_price(c["current_price"]) + "\n"
                 "  24h:    " + fmt_pct(c["change_24h"]) + "\n"
-                "  P&L:    " + fmt_currency(c["pnl"], currency) + " (" + fmt_pct(c["pnl_pct"]) + ")\n"
             )
-        lines.append("\nTOTAL VALUE: " + fmt_currency(pf["total_value"], currency))
-        lines.append("TOTAL P&L:   " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="portfolio")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -1364,10 +1361,7 @@ async def button_callback(update, context):
                 "  Value:  " + fmt_currency(c["current_value"], currency) + "\n"
                 "  Price:  " + fmt_price(c["current_price"]) + "\n"
                 "  24h:    " + fmt_pct(c["change_24h"]) + "\n"
-                "  P&L:    " + fmt_currency(c["pnl"], currency) + " (" + fmt_pct(c["pnl_pct"]) + ")\n"
             )
-        lines.append("\nTOTAL VALUE: " + fmt_currency(pf["total_value"], currency))
-        lines.append("TOTAL P&L:   " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_portfolio")],
                     [InlineKeyboardButton(back, callback_data="help_portfolio")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
