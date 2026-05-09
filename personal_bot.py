@@ -1196,7 +1196,6 @@ async def button_callback(update, context):
     await query.answer()
     uid  = update.effective_user.id
     data = query.data
-    _user_state.pop(uid, None)
     # Reseteaza starea ForceReply la orice click pe buton
     _user_state.pop(uid, None)
 
