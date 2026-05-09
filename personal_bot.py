@@ -1239,7 +1239,7 @@ async def button_callback(update, context):
         if not user.get("watchlist"):
             await query.edit_message_text(t(uid, "watchlist_empty"))
             return
-        lines = ["Watchlist\n"]
+        lines = ["Watchlist (24h)\n"]
         for symbol in user["watchlist"]:
             pd = get_price(resolve_slug(symbol))
             time.sleep(0.3)
@@ -1412,7 +1412,7 @@ async def button_callback(update, context):
                 prices_data = r.json()
         except Exception as e:
             logger.error("watchlist batch error: " + str(e))
-        lines = ["Watchlist\n"]
+        lines = ["Watchlist (24h)\n"]
         for symbol in user["watchlist"]:
             slug = resolve_slug(symbol)
             pd   = prices_data.get(slug, {})
