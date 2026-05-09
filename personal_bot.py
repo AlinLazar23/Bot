@@ -1196,6 +1196,9 @@ async def button_callback(update, context):
     await query.answer()
     uid  = update.effective_user.id
     data = query.data
+    _user_state.pop(uid, None)
+    # Reseteaza starea ForceReply la orice click pe buton
+    _user_state.pop(uid, None)
 
     # ── Help menu ──────────────────────────────────────────────────────────────
     if data == "help_back":
@@ -1632,10 +1635,26 @@ async def button_callback(update, context):
 
     elif data.startswith("pf_add_pick:"):
         coin = data.split(":", 1)[1]
-        _user_state[uid] = "pf_add:" + coin
-        await query.message.reply_text(
-            "Scrie cantitatea si pretul de cumparare pentru " + coin + ":",
-            reply_markup=ForceReply(selective=True, input_field_placeholder="ex: 0.5 45000"))
+        user = get_user(uid)
+        # Adauga moneda cu cantitate 0 si pret 0 - poate fi editat manual cu /portfolio add
+        if coin not in user["portfolio"]:
+            user["portfolio"][coin] = {
+                "slug": resolve_slug(coin), "amount": 0, "buy_price": 0,
+            }
+            save_data()
+        # Arata lista actualizata
+        rows = []
+        row  = []
+        for i, c in enumerate(PREDEFINED_COINS):
+            row.append(InlineKeyboardButton(c, callback_data="pf_add_pick:" + c))
+            if len(row) == 4:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")])
+        msg = coin + " adaugat! Alege alta moneda sau apasa Inapoi."
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("pf_remove:"):
         coin = data.split(":", 1)[1]
