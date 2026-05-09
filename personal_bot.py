@@ -22,11 +22,13 @@ import datetime
 import requests
 import pytz
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
+    MessageHandler,
+    filters,
     ContextTypes,
 )
 
@@ -147,6 +149,9 @@ def get_user(uid):
 # ─── CACHE ─────────────────────────────────────────────────────────────────────
 _cache = {}
 CACHE_TTL = 180
+
+# State pentru ForceReply
+_user_state = {}
 
 def cache_get(key):
     if key in _cache:
@@ -734,8 +739,8 @@ HELP_KEYBOARDS = {
             [InlineKeyboardButton("📊 Vezi Portofoliu",      callback_data="exec_portfolio")],
             [InlineKeyboardButton("📈 P&L Report",           callback_data="exec_pnl")],
             [InlineKeyboardButton("⚠️ Scor de Risc",         callback_data="exec_risk")],
-            [InlineKeyboardButton("➕ Adauga Moneda",         switch_inline_query_current_chat="/portfolio add ")],
-            [InlineKeyboardButton("➖ Sterge Moneda",         switch_inline_query_current_chat="/portfolio remove ")],
+            [InlineKeyboardButton("➕ Adauga Moneda",         callback_data="exec_pf_add_info")],
+            [InlineKeyboardButton("➖ Sterge Moneda",         callback_data="exec_pf_remove_info")],
             [InlineKeyboardButton("⬅️ Inapoi",               callback_data="help_back")],
         ]
     },
@@ -743,8 +748,8 @@ HELP_KEYBOARDS = {
         "title": "👁 Watchlist",
         "keyboard": [
             [InlineKeyboardButton("👁 Vezi Watchlist",      callback_data="exec_watchlist")],
-            [InlineKeyboardButton("➕ Adauga Moneda",       switch_inline_query_current_chat="/watchlist add ")],
-            [InlineKeyboardButton("➖ Sterge Moneda",       switch_inline_query_current_chat="/watchlist remove ")],
+            [InlineKeyboardButton("➕ Adauga Moneda",       callback_data="exec_wl_add_info")],
+            [InlineKeyboardButton("➖ Sterge Moneda",       callback_data="exec_wl_remove_info")],
             [InlineKeyboardButton("⬅️ Inapoi",              callback_data="help_back")],
         ]
     },
@@ -834,11 +839,7 @@ async def cmd_portfolio(update, context):
             return
         user["portfolio"][symbol] = {"slug": resolve_slug(symbol), "amount": amount, "buy_price": buy_price}
         save_data()
-        # Sterge mesajul utilizatorului si nu trimite raspuns
-        try:
-            await update.message.delete()
-        except Exception:
-            pass
+        await update.message.reply_text(t(uid, "portfolio_added", symbol, amount, fmt_price(buy_price)))
         return
 
     if args and args[0].lower() == "remove":
@@ -849,15 +850,9 @@ async def cmd_portfolio(update, context):
         if symbol in user["portfolio"]:
             del user["portfolio"][symbol]
             save_data()
-            try:
-                await update.message.delete()
-            except Exception:
-                pass
+            await update.message.reply_text(t(uid, "portfolio_removed", symbol))
         else:
-            try:
-                await update.message.delete()
-            except Exception:
-                pass
+            await update.message.reply_text(t(uid, "portfolio_not_found", symbol))
         return
 
     if not user.get("portfolio"):
@@ -921,10 +916,7 @@ async def cmd_watchlist(update, context):
         if symbol not in user["watchlist"]:
             user["watchlist"].append(symbol)
             save_data()
-        try:
-            await update.message.delete()
-        except Exception:
-            pass
+        await update.message.reply_text(t(uid, "watchlist_added", symbol))
         return
 
     if args and args[0].lower() == "remove":
@@ -935,10 +927,7 @@ async def cmd_watchlist(update, context):
         if symbol in user["watchlist"]:
             user["watchlist"].remove(symbol)
             save_data()
-        try:
-            await update.message.delete()
-        except Exception:
-            pass
+        await update.message.reply_text(t(uid, "watchlist_removed", symbol))
         return
 
     if not user.get("watchlist"):
@@ -1477,6 +1466,30 @@ async def button_callback(update, context):
                     [InlineKeyboardButton("⬅️ Inapoi",     callback_data="help_market")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
+    elif data == "exec_wl_add_info":
+        _user_state[uid] = "wl_add"
+        await query.message.reply_text(
+            "Scrie simbolul monedei de adaugat la Watchlist:",
+            reply_markup=ForceReply(selective=True, input_field_placeholder="ex: BTC"))
+
+    elif data == "exec_wl_remove_info":
+        _user_state[uid] = "wl_remove"
+        await query.message.reply_text(
+            "Scrie simbolul monedei de sters din Watchlist:",
+            reply_markup=ForceReply(selective=True, input_field_placeholder="ex: BTC"))
+
+    elif data == "exec_pf_add_info":
+        _user_state[uid] = "pf_add"
+        await query.message.reply_text(
+            "Scrie: SIMBOL CANTITATE PRET_CUMPARARE",
+            reply_markup=ForceReply(selective=True, input_field_placeholder="ex: BTC 0.5 45000"))
+
+    elif data == "exec_pf_remove_info":
+        _user_state[uid] = "pf_remove"
+        await query.message.reply_text(
+            "Scrie simbolul monedei de sters din Portofoliu:",
+            reply_markup=ForceReply(selective=True, input_field_placeholder="ex: BTC"))
+
     elif data == "exec_whales":
         txs = get_whale_transactions()
         if not txs:
@@ -1598,6 +1611,58 @@ async def check_daily_reports(context):
             except Exception as e:
                 logger.error("Daily report error for " + str(uid) + ": " + str(e))
 
+
+async def handle_force_reply(update, context):
+    uid   = update.effective_user.id
+    state = _user_state.get(uid)
+    if not state:
+        return
+    text = update.message.text.strip()
+    user = get_user(uid)
+    del _user_state[uid]
+
+    if state == "wl_add":
+        symbol = text.upper()
+        if symbol not in user["watchlist"]:
+            user["watchlist"].append(symbol)
+            save_data()
+        await update.message.reply_text(symbol + " adaugat in Watchlist!")
+
+    elif state == "wl_remove":
+        symbol = text.upper()
+        if symbol in user["watchlist"]:
+            user["watchlist"].remove(symbol)
+            save_data()
+            await update.message.reply_text(symbol + " sters din Watchlist!")
+        else:
+            await update.message.reply_text(symbol + " nu este in Watchlist.")
+
+    elif state == "pf_add":
+        parts = text.split()
+        if len(parts) < 1:
+            await update.message.reply_text("Format invalid. Ex: BTC 0.5 45000")
+            return
+        symbol    = parts[0].upper()
+        amount    = float(parts[1]) if len(parts) > 1 else 0
+        buy_price = float(parts[2]) if len(parts) > 2 else 0
+        user["portfolio"][symbol] = {
+            "slug": resolve_slug(symbol), "amount": amount, "buy_price": buy_price,
+        }
+        save_data()
+        await update.message.reply_text(
+            symbol + " adaugat in Portofoliu!\n"
+            "Cantitate: " + str(amount) + "\n"
+            "Pret cumparare: " + fmt_price(buy_price))
+
+    elif state == "pf_remove":
+        symbol = text.upper()
+        if symbol in user["portfolio"]:
+            del user["portfolio"][symbol]
+            save_data()
+            await update.message.reply_text(symbol + " sters din Portofoliu!")
+        else:
+            await update.message.reply_text(symbol + " nu este in Portofoliu.")
+
 # ─── MAIN ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -1622,6 +1687,7 @@ def main():
     app.add_handler(CommandHandler("set_currency", cmd_set_currency))
     app.add_handler(CommandHandler("risk",         cmd_risk))
     app.add_handler(CallbackQueryHandler(button_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_force_reply))
 
     app.job_queue.run_repeating(check_technical_alerts, interval=CHECK_INTERVAL, first=60)
     app.job_queue.run_repeating(check_daily_reports,    interval=60,             first=30)
