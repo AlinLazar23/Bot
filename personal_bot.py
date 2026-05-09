@@ -528,7 +528,7 @@ def fng_bar(value):
     filled = value // 10
     return "█" * filled + "░" * (10 - filled)
 
-def format_stats_full(fg, global_data, prices, lang="ro"):
+def format_stats_full(fg, global_data, prices, lang):
     utc_now = datetime.datetime.now(datetime.timezone.utc)
     year    = utc_now.year
     march_last = max(datetime.datetime(year, 3, day, 1, tzinfo=datetime.timezone.utc)
@@ -1496,7 +1496,7 @@ async def button_callback(update, context):
         if not fg or not global_data or not prices:
             await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(lang))
             return
-        text = format_stats_full(fg, global_data, prices)
+        text = format_stats_full(fg, global_data, prices, lang)
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_stats")],
                     [InlineKeyboardButton(back, callback_data="help_market")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1810,7 +1810,8 @@ async def button_callback(update, context):
         if not fg or not global_data or not prices:
             await query.edit_message_text(t(uid, "no_data"))
             return
-        text = format_stats_full(fg, global_data, prices)
+        lang_cb = get_user(uid).get("lang", "ro") if "uid" in dir() else "ro"
+        text = format_stats_full(fg, global_data, prices, lang_cb)
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="stats_full")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -1853,6 +1854,7 @@ async def button_callback(update, context):
 
 
 async def check_technical_alerts(context):
+    await asyncio.sleep(0)  # yield control
     fg = get_fear_greed(fresh=True)
     if fg:
         logger.info("Fear & Greed check: " + str(fg["value"]))
