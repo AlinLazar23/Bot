@@ -1263,7 +1263,7 @@ async def button_callback(update, context):
         if not user.get("watchlist"):
             await query.edit_message_text(t(uid, "watchlist_empty"))
             return
-        lines = ["Watchlist (24h)\n"]
+        lines = [tx(get_user(uid).get("lang","ro"), "Watchlist (24h)\n", "Watchlist (24h)\n")]
         for symbol in user["watchlist"]:
             pd = get_price(resolve_slug(symbol))
             time.sleep(0.3)
@@ -1436,7 +1436,7 @@ async def button_callback(update, context):
                 prices_data = r.json()
         except Exception as e:
             logger.error("watchlist batch error: " + str(e))
-        lines = ["Watchlist (24h)\n"]
+        lines = [tx(get_user(uid).get("lang","ro"), "Watchlist (24h)\n", "Watchlist (24h)\n")]
         for symbol in user["watchlist"]:
             slug = resolve_slug(symbol)
             pd   = prices_data.get(slug, {})
@@ -1519,7 +1519,7 @@ async def button_callback(update, context):
         for key, (_, label) in SECTORS.items():
             kb.append([InlineKeyboardButton(label, callback_data="exec_sector:" + key)])
         kb.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_market")])
-        await query.edit_message_text("\n".join(lines) + "\nAlege un sector:", reply_markup=InlineKeyboardMarkup(kb))
+        await query.edit_message_text("\n".join(lines) + tx(get_user(uid).get("lang","ro"), "\nAlege un sector:", "\nChoose a sector:"), reply_markup=InlineKeyboardMarkup(kb))
 
     elif data.startswith("exec_sector:"):
         key = data.split(":", 1)[1]
@@ -1553,14 +1553,14 @@ async def button_callback(update, context):
         if row:
             rows.append(row)
         rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
-        await query.edit_message_text("Alege moneda de adaugat la Watchlist:",
+        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de adaugat la Watchlist:", "Choose coin to add to Watchlist:"),
                                       reply_markup=InlineKeyboardMarkup(rows))
 
     elif data == "exec_wl_remove_list":
         user = get_user(uid)
         wl   = user.get("watchlist", [])
         if not wl:
-            await query.edit_message_text("Watchlist-ul tau este gol.",
+            await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Watchlist-ul tau este gol.", "Your watchlist is empty."),
                                           reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")]]))
             return
         rows = []
@@ -1573,7 +1573,7 @@ async def button_callback(update, context):
         if row:
             rows.append(row)
         rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
-        await query.edit_message_text("Alege moneda de sters din Watchlist:",
+        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de sters din Watchlist:", "Choose coin to remove from Watchlist:"),
                                       reply_markup=InlineKeyboardMarkup(rows))
 
     elif data == "exec_pf_add_list":
@@ -1587,14 +1587,14 @@ async def button_callback(update, context):
         if row:
             rows.append(row)
         rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")])
-        await query.edit_message_text("Alege moneda de adaugat in Portofoliu:",
+        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de adaugat in Portofoliu:", "Choose coin to add to Portfolio:"),
                                       reply_markup=InlineKeyboardMarkup(rows))
 
     elif data == "exec_pf_remove_list":
         user = get_user(uid)
         pf   = user.get("portfolio", {})
         if not pf:
-            await query.edit_message_text("Portofoliul tau este gol.",
+            await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Portofoliul tau este gol.", "Your portfolio is empty."),
                                           reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")]]))
             return
         rows = []
@@ -1607,7 +1607,7 @@ async def button_callback(update, context):
         if row:
             rows.append(row)
         rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")])
-        await query.edit_message_text("Alege moneda de sters din Portofoliu:",
+        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de sters din Portofoliu:", "Choose coin to remove from Portfolio:"),
                                       reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("wl_add:"):
@@ -1627,7 +1627,7 @@ async def button_callback(update, context):
         if row:
             rows.append(row)
         rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
-        await query.edit_message_text("Alege moneda de adaugat la Watchlist:",
+        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de adaugat la Watchlist:", "Choose coin to add to Watchlist:"),
                                       reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("wl_remove:"):
@@ -1638,7 +1638,7 @@ async def button_callback(update, context):
             save_data()
         wl = user.get("watchlist", [])
         if not wl:
-            await query.edit_message_text("Watchlist-ul tau este gol.",
+            await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Watchlist-ul tau este gol.", "Your watchlist is empty."),
                                           reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")]]))
             return
         rows = []
@@ -1651,14 +1651,14 @@ async def button_callback(update, context):
         if row:
             rows.append(row)
         rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
-        await query.edit_message_text("Alege moneda de sters din Watchlist:",
+        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de sters din Watchlist:", "Choose coin to remove from Watchlist:"),
                                       reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("pf_add_pick:"):
         coin = data.split(":", 1)[1]
         _user_state[uid] = "pf_add:" + coin
         await query.message.reply_text(
-            "Scrie cantitatea si pretul pentru " + coin + " (ex: 0.5 45000):",
+            tx(get_user(uid).get("lang","ro"), "Scrie cantitatea si pretul pentru " + coin + " (ex: 0.5 45000):", "Enter amount and buy price for " + coin + " (e.g. 0.5 45000):"),
             reply_markup=ForceReply(selective=True, input_field_placeholder="ex: 0.5 45000"))
 
     elif data.startswith("pf_remove:"):
@@ -1669,7 +1669,7 @@ async def button_callback(update, context):
             save_data()
         pf = user.get("portfolio", {})
         if not pf:
-            await query.edit_message_text("Portofoliul tau este gol.",
+            await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Portofoliul tau este gol.", "Your portfolio is empty."),
                                           reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")]]))
             return
         rows = []
@@ -1682,7 +1682,7 @@ async def button_callback(update, context):
         if row:
             rows.append(row)
         rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")])
-        await query.edit_message_text("Alege moneda de sters din Portofoliu:",
+        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Alege moneda de sters din Portofoliu:", "Choose coin to remove from Portfolio:"),
                                       reply_markup=InlineKeyboardMarkup(rows))
 
     elif data == "exec_alert_ema_menu":
@@ -1698,7 +1698,7 @@ async def button_callback(update, context):
             rows.append(row)
         rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_alerts")])
         await query.edit_message_text(
-            "Alege moneda pentru alerta EMA200 Daily:",
+            tx(get_user(uid).get("lang","ro"), "Alege moneda pentru alerta EMA200 Daily:", "Choose coin for EMA200 Daily alert:"),
             reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("alert_ema_coin:"):
@@ -1707,7 +1707,7 @@ async def button_callback(update, context):
         slug  = resolve_slug(coin)
         period = 200
         # Calculate EMA
-        await query.edit_message_text("Se calculeaza EMA200 pentru " + coin + "...")
+        await query.edit_message_text(tx(get_user(uid).get("lang","ro"), "Se calculeaza EMA200 pentru " + coin + "...", "Calculating EMA200 for " + coin + "..."))
         ema   = get_ema(slug, period, "daily")
         price = get_current_price_simple(slug)
         if ema is None:
@@ -1750,7 +1750,7 @@ async def button_callback(update, context):
         ]
         fg = get_fear_greed()
         current = "Fear & Greed curent: " + str(fg["value"]) + "/100" if fg else ""
-        msg2 = "Alege pragul pentru alerta Fear & Greed:\n(primesti alerta cand scade sub valoarea aleasa)\n\n" + current
+        msg2 = tx(get_user(uid).get("lang","ro"), "Alege pragul pentru alerta Fear & Greed:\n(primesti alerta cand scade sub valoarea aleasa)\n\n", "Choose Fear & Greed alert threshold:\n(you get alerted when it drops below)\n\n") + current
         await query.edit_message_text(msg2, reply_markup=InlineKeyboardMarkup(rows))
 
     elif data.startswith("alert_fear_set:"):
