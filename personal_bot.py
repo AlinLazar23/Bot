@@ -1783,8 +1783,9 @@ async def button_callback(update, context):
         user = get_user(uid)
         user["lang"] = lang
         save_data()
-        msg = "Limba setata: Romana" if lang == "ro" else "Language set: English"
-        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_settings")]]
+        msg  = "Limba setata: Romana" if lang == "ro" else "Language set: English"
+        back = "⬅️ Inapoi" if lang == "ro" else "⬅️ Back"
+        keyboard = [[InlineKeyboardButton(back, callback_data="help_settings")]]
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data.startswith("exec_cur_"):
@@ -1792,8 +1793,15 @@ async def button_callback(update, context):
         user = get_user(uid)
         user["currency"] = currency
         save_data()
-        keyboard = [[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_settings")]]
-        await query.edit_message_text("Moneda setata: " + currency, reply_markup=InlineKeyboardMarkup(keyboard))
+        # Sterge cache-ul pentru ratele de schimb
+        for key in list(_cache.keys()):
+            if key.startswith("rate:"):
+                del _cache[key]
+        lang  = user.get("lang", "ro")
+        msg   = ("Moneda setata: " if lang == "ro" else "Currency set: ") + currency
+        back  = "⬅️ Inapoi" if lang == "ro" else "⬅️ Back"
+        keyboard = [[InlineKeyboardButton(back, callback_data="help_settings")]]
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "help":
         lang = get_user(uid).get("lang", "ro")
