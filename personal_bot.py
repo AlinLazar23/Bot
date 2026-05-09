@@ -150,6 +150,8 @@ def get_user(uid):
 _cache = {}
 CACHE_TTL = 180
 
+CACHE_TTL_STATS = 600  # 10 min pentru stats
+
 # State pentru ForceReply
 _user_state = {}
 
@@ -346,7 +348,7 @@ def get_fear_greed_stats():
                     "yesterday": int(data[1]["value"]) if len(data) > 1 else int(data[0]["value"]),
                     "week_avg":  round(sum(week_vals) / len(week_vals), 1),
                 }
-                cache_set("fear_greed_stats", result)
+                _cache["fear_greed_stats"] = (result, time.time() - CACHE_TTL + CACHE_TTL_STATS)
                 return result
     except Exception as e:
         logger.error("get_fear_greed_stats error: " + str(e))
@@ -421,7 +423,7 @@ def get_global_market():
         "eth_dominance":         round(d.get("market_cap_percentage", {}).get("eth", 0), 2),
         "market_cap_change_24h": d.get("market_cap_change_percentage_24h_usd", 0),
     }
-    cache_set("global_market", result)
+    _cache["global_market"] = (result, time.time() - CACHE_TTL + CACHE_TTL_STATS)
     return result
 
 def get_btc_eth_prices():
@@ -442,7 +444,7 @@ def get_btc_eth_prices():
         elif c["id"] == "ethereum":
             result["eth_price"]  = c.get("current_price", 0)
             result["eth_change"] = c.get("price_change_percentage_24h") or 0
-    cache_set("btc_eth_prices", result)
+    _cache["btc_eth_prices"] = (result, time.time() - CACHE_TTL + CACHE_TTL_STATS)
     return result
 
 def get_sector_coins(category_id, limit=15):
