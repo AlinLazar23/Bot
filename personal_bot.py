@@ -728,89 +728,104 @@ async def generate_report(uid):
 
 # ─── HELP MENU ─────────────────────────────────────────────────────────────────
 
-def help_main_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📁 Portofoliu",  callback_data="help_portfolio"),
-         InlineKeyboardButton("👁 Watchlist",   callback_data="help_watchlist")],
-        [InlineKeyboardButton("🔔 Alerte",      callback_data="help_alerts"),
-         InlineKeyboardButton("📊 Rapoarte",    callback_data="help_reports")],
-        [InlineKeyboardButton("📈 Piata",       callback_data="help_market"),
-         InlineKeyboardButton("🐋 Balene",      callback_data="help_whales")],
-        [InlineKeyboardButton("⚙️ Setari",      callback_data="help_settings")],
-    ])
+def help_main_keyboard(lang="ro"):
+    if lang == "ro":
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("📁 Portofoliu",  callback_data="help_portfolio"),
+             InlineKeyboardButton("👁 Watchlist",   callback_data="help_watchlist")],
+            [InlineKeyboardButton("🔔 Alerte",      callback_data="help_alerts"),
+             InlineKeyboardButton("📊 Rapoarte",    callback_data="help_reports")],
+            [InlineKeyboardButton("📈 Piata",       callback_data="help_market"),
+             InlineKeyboardButton("🐋 Balene",      callback_data="help_whales")],
+            [InlineKeyboardButton("⚙️ Setari",      callback_data="help_settings")],
+        ])
+    else:
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("📁 Portfolio",   callback_data="help_portfolio"),
+             InlineKeyboardButton("👁 Watchlist",   callback_data="help_watchlist")],
+            [InlineKeyboardButton("🔔 Alerts",      callback_data="help_alerts"),
+             InlineKeyboardButton("📊 Reports",     callback_data="help_reports")],
+            [InlineKeyboardButton("📈 Market",      callback_data="help_market"),
+             InlineKeyboardButton("🐋 Whales",      callback_data="help_whales")],
+            [InlineKeyboardButton("⚙️ Settings",    callback_data="help_settings")],
+        ])
 
-def back_keyboard():
-    return InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_back")]])
+def back_keyboard(lang="ro"):
+    label = "⬅️ Inapoi" if lang == "ro" else "⬅️ Back"
+    return InlineKeyboardMarkup([[InlineKeyboardButton(label, callback_data="help_back")]])
 
-# Category keyboards for help menu
-HELP_KEYBOARDS = {
-    "help_portfolio": {
-        "title": "📁 Portofoliu",
-        "keyboard": [
-            [InlineKeyboardButton("📊 Vezi Portofoliu",      callback_data="exec_portfolio")],
-            [InlineKeyboardButton("📈 P&L Report",           callback_data="exec_pnl")],
-            [InlineKeyboardButton("⚠️ Scor de Risc",         callback_data="exec_risk")],
-            [InlineKeyboardButton("➕ Adauga Moneda",         callback_data="exec_pf_add_list")],
-            [InlineKeyboardButton("➖ Sterge Moneda",         callback_data="exec_pf_remove_list")],
-            [InlineKeyboardButton("⬅️ Inapoi",               callback_data="help_back")],
-        ]
-    },
-    "help_watchlist": {
-        "title": "👁 Watchlist",
-        "keyboard": [
-            [InlineKeyboardButton("👁 Vezi Watchlist",      callback_data="exec_watchlist")],
-            [InlineKeyboardButton("➕ Adauga Moneda",       callback_data="exec_wl_add_list")],
-            [InlineKeyboardButton("➖ Sterge Moneda",       callback_data="exec_wl_remove_list")],
-            [InlineKeyboardButton("⬅️ Inapoi",              callback_data="help_back")],
-        ]
-    },
-    "help_alerts": {
-        "title": "🔔 Alerte",
-        "keyboard": [
-            [InlineKeyboardButton("🔔 Alertele Mele",        callback_data="exec_alerts")],
-            [InlineKeyboardButton("📈 Seteaza Alerta EMA",   callback_data="exec_alert_ema_menu")],
-            [InlineKeyboardButton("😱 Seteaza Alerta Fear",  callback_data="exec_alert_fear_menu")],
-            [InlineKeyboardButton("⬅️ Inapoi",               callback_data="help_back")],
-        ]
-    },
-    "help_reports": {
-        "title": "📊 Rapoarte",
-        "keyboard": [
-            [InlineKeyboardButton("📊 Raport Acum",      callback_data="exec_report")],
-            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
-        ]
-    },
-    "help_market": {
-        "title": "📈 Piata",
-        "keyboard": [
-            [InlineKeyboardButton("🔥 Trending",         callback_data="exec_trending")],
-            [InlineKeyboardButton("📊 Stats Piata",      callback_data="exec_stats")],
-            [InlineKeyboardButton("🏭 Sectoare",         callback_data="exec_sector_list")],
-            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
-        ]
-    },
-    "help_whales": {
-        "title": "🐋 Balene",
-        "keyboard": [
-            [InlineKeyboardButton("🐋 Vezi Tranzactii",  callback_data="exec_whales")],
-            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
-        ]
-    },
-    "help_settings": {
-        "title": "⚙️ Setari",
-        "keyboard": [
-            [InlineKeyboardButton("🇷🇴 Limba Romana",    callback_data="exec_lang_ro")],
-            [InlineKeyboardButton("🇬🇧 English",         callback_data="exec_lang_en")],
-            [InlineKeyboardButton("💵 USD",              callback_data="exec_cur_USD"),
-             InlineKeyboardButton("💶 EUR",              callback_data="exec_cur_EUR")],
-            [InlineKeyboardButton("💷 GBP",              callback_data="exec_cur_GBP"),
-             InlineKeyboardButton("🇷🇴 RON",             callback_data="exec_cur_RON")],
-            [InlineKeyboardButton("⬅️ Inapoi",           callback_data="help_back")],
-        ]
-    },
-}
+def get_help_keyboards(lang="ro"):
+    """Returns translated help keyboards based on user language."""
+    back = "⬅️ Inapoi" if lang == "ro" else "⬅️ Back"
+    return {
+        "help_portfolio": {
+            "title": "📁 Portofoliu" if lang == "ro" else "📁 Portfolio",
+            "keyboard": [
+                [InlineKeyboardButton("📊 Vezi Portofoliu" if lang == "ro" else "📊 View Portfolio", callback_data="exec_portfolio")],
+                [InlineKeyboardButton("📈 P&L Report",           callback_data="exec_pnl")],
+                [InlineKeyboardButton("⚠️ Scor de Risc" if lang == "ro" else "⚠️ Risk Score", callback_data="exec_risk")],
+                [InlineKeyboardButton("➕ Adauga Moneda" if lang == "ro" else "➕ Add Coin", callback_data="exec_pf_add_list")],
+                [InlineKeyboardButton("➖ Sterge Moneda" if lang == "ro" else "➖ Remove Coin", callback_data="exec_pf_remove_list")],
+                [InlineKeyboardButton(back, callback_data="help_back")],
+            ]
+        },
+        "help_watchlist": {
+            "title": "👁 Watchlist",
+            "keyboard": [
+                [InlineKeyboardButton("👁 Vezi Watchlist" if lang == "ro" else "👁 View Watchlist", callback_data="exec_watchlist")],
+                [InlineKeyboardButton("➕ Adauga Moneda" if lang == "ro" else "➕ Add Coin", callback_data="exec_wl_add_list")],
+                [InlineKeyboardButton("➖ Sterge Moneda" if lang == "ro" else "➖ Remove Coin", callback_data="exec_wl_remove_list")],
+                [InlineKeyboardButton(back, callback_data="help_back")],
+            ]
+        },
+        "help_alerts": {
+            "title": "🔔 Alerte" if lang == "ro" else "🔔 Alerts",
+            "keyboard": [
+                [InlineKeyboardButton("🔔 Alertele Mele" if lang == "ro" else "🔔 My Alerts", callback_data="exec_alerts")],
+                [InlineKeyboardButton("📈 Seteaza Alerta EMA" if lang == "ro" else "📈 Set EMA Alert", callback_data="exec_alert_ema_menu")],
+                [InlineKeyboardButton("😱 Seteaza Alerta Fear" if lang == "ro" else "😱 Set Fear Alert", callback_data="exec_alert_fear_menu")],
+                [InlineKeyboardButton(back, callback_data="help_back")],
+            ]
+        },
+        "help_reports": {
+            "title": "📊 Rapoarte" if lang == "ro" else "📊 Reports",
+            "keyboard": [
+                [InlineKeyboardButton("📊 Raport Acum" if lang == "ro" else "📊 Report Now", callback_data="exec_report")],
+                [InlineKeyboardButton(back, callback_data="help_back")],
+            ]
+        },
+        "help_market": {
+            "title": "📈 Piata" if lang == "ro" else "📈 Market",
+            "keyboard": [
+                [InlineKeyboardButton("🔥 Trending", callback_data="exec_trending")],
+                [InlineKeyboardButton("📊 Stats Piata" if lang == "ro" else "📊 Market Stats", callback_data="exec_stats")],
+                [InlineKeyboardButton("🏭 Sectoare" if lang == "ro" else "🏭 Sectors", callback_data="exec_sector_list")],
+                [InlineKeyboardButton(back, callback_data="help_back")],
+            ]
+        },
+        "help_whales": {
+            "title": "🐋 Balene" if lang == "ro" else "🐋 Whales",
+            "keyboard": [
+                [InlineKeyboardButton("🐋 Vezi Tranzactii" if lang == "ro" else "🐋 View Transactions", callback_data="exec_whales")],
+                [InlineKeyboardButton(back, callback_data="help_back")],
+            ]
+        },
+        "help_settings": {
+            "title": "⚙️ Setari" if lang == "ro" else "⚙️ Settings",
+            "keyboard": [
+                [InlineKeyboardButton("🇷🇴 Limba Romana", callback_data="exec_lang_ro")],
+                [InlineKeyboardButton("🇬🇧 English",      callback_data="exec_lang_en")],
+                [InlineKeyboardButton("💵 USD", callback_data="exec_cur_USD"),
+                 InlineKeyboardButton("💶 EUR", callback_data="exec_cur_EUR")],
+                [InlineKeyboardButton("💷 GBP", callback_data="exec_cur_GBP"),
+                 InlineKeyboardButton("🇷🇴 RON", callback_data="exec_cur_RON")],
+                [InlineKeyboardButton(back, callback_data="help_back")],
+            ]
+        },
+    }
 
-HELP_TEXTS = {k: v for k, v in HELP_KEYBOARDS.items()}  # kept for compatibility
+# Keep HELP_KEYBOARDS as alias for compatibility
+HELP_KEYBOARDS = get_help_keyboards("ro")
 
 # ─── COMMAND HANDLERS ──────────────────────────────────────────────────────────
 
@@ -818,17 +833,19 @@ async def cmd_start(update, context):
     uid = update.effective_user.id
     get_user(uid)
     save_data()
+    lang = get_user(uid).get('lang', 'ro')
     keyboard = [
-        [InlineKeyboardButton("📁 Portfolio",  callback_data="portfolio"),
+        [InlineKeyboardButton("📁 Portofoliu" if lang == 'ro' else "📁 Portfolio", callback_data="portfolio"),
          InlineKeyboardButton("👁 Watchlist",  callback_data="watchlist")],
         [InlineKeyboardButton("📊 Report",     callback_data="report"),
-         InlineKeyboardButton("🐋 Whales",     callback_data="whales")],
+         InlineKeyboardButton("🐋 " + ("Balene" if lang == 'ro' else "Whales"), callback_data="whales")],
         [InlineKeyboardButton("❓ Help",        callback_data="help_back")],
     ]
     await update.message.reply_text(t(uid, "welcome"), reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def cmd_help(update, context):
-    await update.message.reply_text("Alege o categorie:", reply_markup=help_main_keyboard())
+    lang = get_user(uid).get("lang", "ro")
+    await update.message.reply_text("Alege o categorie:" if lang == "ro" else "Choose a category:", reply_markup=help_main_keyboard(lang))
 
 async def cmd_chatid(update, context):
     await update.message.reply_text(
@@ -1203,11 +1220,14 @@ async def button_callback(update, context):
 
     # ── Help menu ──────────────────────────────────────────────────────────────
     if data == "help_back":
-        await query.edit_message_text("Alege o categorie:", reply_markup=help_main_keyboard())
+        lang = get_user(uid).get("lang", "ro")
+        label = "Alege o categorie:" if lang == "ro" else "Choose a category:"
+        await query.edit_message_text(label, reply_markup=help_main_keyboard(lang))
         return
 
-    if data in HELP_KEYBOARDS:
-        cat = HELP_KEYBOARDS[data]
+    if data in get_help_keyboards():
+        lang = get_user(uid).get("lang", "ro")
+        cat  = get_help_keyboards(lang)[data]
         await query.edit_message_text(
             cat["title"],
             reply_markup=InlineKeyboardMarkup(cat["keyboard"]))
@@ -1334,11 +1354,11 @@ async def button_callback(update, context):
         if not user.get("portfolio"):
             await query.edit_message_text(
                 t(uid, "portfolio_empty"),
-                reply_markup=back_keyboard())
+                reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
             return
         pf = calculate_portfolio(uid)
         if not pf:
-            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard())
+            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
             return
         currency = user.get("currency", "USD")
         lines = ["Your Portfolio\n"]
@@ -1359,11 +1379,11 @@ async def button_callback(update, context):
     elif data == "exec_pnl":
         user = get_user(uid)
         if not user.get("portfolio"):
-            await query.edit_message_text(t(uid, "pnl_empty"), reply_markup=back_keyboard())
+            await query.edit_message_text(t(uid, "pnl_empty"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
             return
         pf = calculate_portfolio(uid)
         if not pf:
-            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard())
+            await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
             return
         currency = user.get("currency", "USD")
         lines = ["P&L Report\n"]
@@ -1382,7 +1402,7 @@ async def button_callback(update, context):
     elif data == "exec_risk":
         user = get_user(uid)
         if not user.get("portfolio"):
-            await query.edit_message_text(t(uid, "portfolio_empty"), reply_markup=back_keyboard())
+            await query.edit_message_text(t(uid, "portfolio_empty"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
             return
         pf    = calculate_portfolio(uid)
         score, label, notes = calculate_risk_score(pf)
@@ -1396,7 +1416,7 @@ async def button_callback(update, context):
     elif data == "exec_watchlist":
         user = get_user(uid)
         if not user.get("watchlist"):
-            await query.edit_message_text(t(uid, "watchlist_empty"), reply_markup=back_keyboard())
+            await query.edit_message_text(t(uid, "watchlist_empty"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
             return
         # Batch request pentru toate monedele din watchlist
         slugs = [resolve_slug(s) for s in user["watchlist"]]
@@ -1436,7 +1456,7 @@ async def button_callback(update, context):
         ema_a  = alerts.get("ema", {})
         fear_a = alerts.get("fear")
         if not ema_a and not fear_a:
-            await query.edit_message_text(t(uid, "alerts_empty"), reply_markup=back_keyboard())
+            await query.edit_message_text(t(uid, "alerts_empty"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
             return
         lines = ["Your Alerts\n"]
         if ema_a:
@@ -1459,7 +1479,7 @@ async def button_callback(update, context):
             del _cache["trending"]
         coins = get_trending_coins()
         if not coins:
-            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard())
+            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
             return
         lines = ["Trending pe CoinGecko\n"]
         for item in coins[:7]:
@@ -1486,7 +1506,7 @@ async def button_callback(update, context):
             if fg and global_data and prices:
                 break
         if not fg or not global_data or not prices:
-            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard())
+            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
             return
         text = format_stats_full(fg, global_data, prices)
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_stats")],
@@ -1509,7 +1529,7 @@ async def button_callback(update, context):
         category_id, label = SECTORS[key]
         coins = get_sector_coins(category_id)
         if not coins:
-            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard())
+            await query.edit_message_text("Nu s-au putut obtine datele.", reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
             return
         lines = [label + " - Top " + str(len(coins)) + "\n"]
         for c in coins:
@@ -1745,7 +1765,7 @@ async def button_callback(update, context):
     elif data == "exec_whales":
         txs = get_whale_transactions()
         if not txs:
-            await query.edit_message_text(t(uid, "no_whales"), reply_markup=back_keyboard())
+            await query.edit_message_text(t(uid, "no_whales"), reply_markup=back_keyboard(get_user(uid).get("lang", "ro")))
             return
         lines = [t(uid, "whales_title") + "\n"]
         for tx in txs[:8]:
@@ -1776,10 +1796,14 @@ async def button_callback(update, context):
         await query.edit_message_text("Moneda setata: " + currency, reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "help":
-        await query.edit_message_text("Alege o categorie:", reply_markup=help_main_keyboard())
+        lang = get_user(uid).get("lang", "ro")
+        label = "Alege o categorie:" if lang == "ro" else "Choose a category:"
+        await query.edit_message_text(label, reply_markup=help_main_keyboard(lang))
 
     elif data == "help":
-        await query.edit_message_text("Alege o categorie:", reply_markup=help_main_keyboard())
+        lang = get_user(uid).get("lang", "ro")
+        label = "Alege o categorie:" if lang == "ro" else "Choose a category:"
+        await query.edit_message_text(label, reply_markup=help_main_keyboard(lang))
 
 # ─── BACKGROUND JOBS ───────────────────────────────────────────────────────────
 
