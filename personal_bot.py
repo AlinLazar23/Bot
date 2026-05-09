@@ -183,6 +183,17 @@ COIN_SLUG_MAP = {
 def resolve_slug(symbol):
     return COIN_SLUG_MAP.get(symbol.upper(), symbol.lower())
 
+
+# ─── MONEDE PREDEFINITE ────────────────────────────────────────────────────────
+# Adauga sau sterge monede din aceasta lista dupa preferinta
+PREDEFINED_COINS = [
+    "BTC", "ETH", "SOL", "BNB", "XRP",
+    "ADA", "DOGE", "AVAX", "LINK", "DOT",
+    "MATIC", "NEAR", "ATOM", "ALGO", "TRX",
+    "SUI", "ARB", "OP", "INJ", "FET",
+    "PEPE", "HYPE", "ICP", "FIL", "VET",
+    "SEI", "TIA", "GRT", "EGLD", "GALA",
+]
 # ─── SECTOARE ──────────────────────────────────────────────────────────────────
 SECTORS = {
     "ai":      ("artificial-intelligence",    "AI & Big Data"),
@@ -739,8 +750,8 @@ HELP_KEYBOARDS = {
             [InlineKeyboardButton("📊 Vezi Portofoliu",      callback_data="exec_portfolio")],
             [InlineKeyboardButton("📈 P&L Report",           callback_data="exec_pnl")],
             [InlineKeyboardButton("⚠️ Scor de Risc",         callback_data="exec_risk")],
-            [InlineKeyboardButton("➕ Adauga Moneda",         callback_data="exec_pf_add_info")],
-            [InlineKeyboardButton("➖ Sterge Moneda",         callback_data="exec_pf_remove_info")],
+            [InlineKeyboardButton("➕ Adauga Moneda",         callback_data="exec_pf_add_list")],
+            [InlineKeyboardButton("➖ Sterge Moneda",         callback_data="exec_pf_remove_list")],
             [InlineKeyboardButton("⬅️ Inapoi",               callback_data="help_back")],
         ]
     },
@@ -748,8 +759,8 @@ HELP_KEYBOARDS = {
         "title": "👁 Watchlist",
         "keyboard": [
             [InlineKeyboardButton("👁 Vezi Watchlist",      callback_data="exec_watchlist")],
-            [InlineKeyboardButton("➕ Adauga Moneda",       callback_data="exec_wl_add_info")],
-            [InlineKeyboardButton("➖ Sterge Moneda",       callback_data="exec_wl_remove_info")],
+            [InlineKeyboardButton("➕ Adauga Moneda",       callback_data="exec_wl_add_list")],
+            [InlineKeyboardButton("➖ Sterge Moneda",       callback_data="exec_wl_remove_list")],
             [InlineKeyboardButton("⬅️ Inapoi",              callback_data="help_back")],
         ]
     },
@@ -1466,29 +1477,148 @@ async def button_callback(update, context):
                     [InlineKeyboardButton("⬅️ Inapoi",     callback_data="help_market")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
-    elif data == "exec_wl_add_info":
-        _user_state[uid] = "wl_add"
-        await query.message.reply_text(
-            "Scrie simbolul monedei de adaugat la Watchlist:",
-            reply_markup=ForceReply(selective=True, input_field_placeholder="ex: BTC"))
+    elif data == "exec_wl_add_list":
+        rows = []
+        row  = []
+        for i, coin in enumerate(PREDEFINED_COINS):
+            row.append(InlineKeyboardButton(coin, callback_data="wl_add:" + coin))
+            if len(row) == 4:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
+        await query.edit_message_text("Alege moneda de adaugat la Watchlist:",
+                                      reply_markup=InlineKeyboardMarkup(rows))
 
-    elif data == "exec_wl_remove_info":
-        _user_state[uid] = "wl_remove"
-        await query.message.reply_text(
-            "Scrie simbolul monedei de sters din Watchlist:",
-            reply_markup=ForceReply(selective=True, input_field_placeholder="ex: BTC"))
+    elif data == "exec_wl_remove_list":
+        user = get_user(uid)
+        wl   = user.get("watchlist", [])
+        if not wl:
+            await query.edit_message_text("Watchlist-ul tau este gol.",
+                                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")]]))
+            return
+        rows = []
+        row  = []
+        for i, coin in enumerate(wl):
+            row.append(InlineKeyboardButton(coin, callback_data="wl_remove:" + coin))
+            if len(row) == 4:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
+        await query.edit_message_text("Alege moneda de sters din Watchlist:",
+                                      reply_markup=InlineKeyboardMarkup(rows))
 
-    elif data == "exec_pf_add_info":
-        _user_state[uid] = "pf_add"
-        await query.message.reply_text(
-            "Scrie: SIMBOL CANTITATE PRET_CUMPARARE",
-            reply_markup=ForceReply(selective=True, input_field_placeholder="ex: BTC 0.5 45000"))
+    elif data == "exec_pf_add_list":
+        rows = []
+        row  = []
+        for i, coin in enumerate(PREDEFINED_COINS):
+            row.append(InlineKeyboardButton(coin, callback_data="pf_add_pick:" + coin))
+            if len(row) == 4:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")])
+        await query.edit_message_text("Alege moneda de adaugat in Portofoliu:",
+                                      reply_markup=InlineKeyboardMarkup(rows))
 
-    elif data == "exec_pf_remove_info":
-        _user_state[uid] = "pf_remove"
+    elif data == "exec_pf_remove_list":
+        user = get_user(uid)
+        pf   = user.get("portfolio", {})
+        if not pf:
+            await query.edit_message_text("Portofoliul tau este gol.",
+                                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")]]))
+            return
+        rows = []
+        row  = []
+        for i, coin in enumerate(pf.keys()):
+            row.append(InlineKeyboardButton(coin, callback_data="pf_remove:" + coin))
+            if len(row) == 4:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")])
+        await query.edit_message_text("Alege moneda de sters din Portofoliu:",
+                                      reply_markup=InlineKeyboardMarkup(rows))
+
+    elif data.startswith("wl_add:"):
+        coin = data.split(":", 1)[1]
+        user = get_user(uid)
+        if coin not in user["watchlist"]:
+            user["watchlist"].append(coin)
+            save_data()
+        # Refresh list
+        rows = []
+        row  = []
+        for i, c in enumerate(PREDEFINED_COINS):
+            row.append(InlineKeyboardButton(c, callback_data="wl_add:" + c))
+            if len(row) == 4:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
+        await query.edit_message_text("Alege moneda de adaugat la Watchlist:",
+                                      reply_markup=InlineKeyboardMarkup(rows))
+
+    elif data.startswith("wl_remove:"):
+        coin = data.split(":", 1)[1]
+        user = get_user(uid)
+        if coin in user["watchlist"]:
+            user["watchlist"].remove(coin)
+            save_data()
+        wl = user.get("watchlist", [])
+        if not wl:
+            await query.edit_message_text("Watchlist-ul tau este gol.",
+                                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")]]))
+            return
+        rows = []
+        row  = []
+        for i, c in enumerate(wl):
+            row.append(InlineKeyboardButton(c, callback_data="wl_remove:" + c))
+            if len(row) == 4:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_watchlist")])
+        await query.edit_message_text("Alege moneda de sters din Watchlist:",
+                                      reply_markup=InlineKeyboardMarkup(rows))
+
+    elif data.startswith("pf_add_pick:"):
+        coin = data.split(":", 1)[1]
+        _user_state[uid] = "pf_add:" + coin
         await query.message.reply_text(
-            "Scrie simbolul monedei de sters din Portofoliu:",
-            reply_markup=ForceReply(selective=True, input_field_placeholder="ex: BTC"))
+            "Scrie cantitatea si pretul de cumparare pentru " + coin + ":",
+            reply_markup=ForceReply(selective=True, input_field_placeholder="ex: 0.5 45000"))
+
+    elif data.startswith("pf_remove:"):
+        coin = data.split(":", 1)[1]
+        user = get_user(uid)
+        if coin in user["portfolio"]:
+            del user["portfolio"][coin]
+            save_data()
+        pf = user.get("portfolio", {})
+        if not pf:
+            await query.edit_message_text("Portofoliul tau este gol.",
+                                          reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")]]))
+            return
+        rows = []
+        row  = []
+        for i, c in enumerate(pf.keys()):
+            row.append(InlineKeyboardButton(c, callback_data="pf_remove:" + c))
+            if len(row) == 4:
+                rows.append(row)
+                row = []
+        if row:
+            rows.append(row)
+        rows.append([InlineKeyboardButton("⬅️ Inapoi", callback_data="help_portfolio")])
+        await query.edit_message_text("Alege moneda de sters din Portofoliu:",
+                                      reply_markup=InlineKeyboardMarkup(rows))
 
     elif data == "exec_whales":
         txs = get_whale_transactions()
@@ -1633,12 +1763,18 @@ async def handle_force_reply(update, context):
             user["watchlist"].remove(symbol)
             save_data()
 
-    elif state == "pf_add":
+    elif state.startswith("pf_add"):
+        # state = "pf_add:BTC" (from list) or "pf_add" (legacy)
         parts = text.split()
-        if len(parts) >= 1:
-            symbol    = parts[0].upper()
+        if ":" in state:
+            symbol    = state.split(":", 1)[1]
+            amount    = float(parts[0]) if len(parts) > 0 else 0
+            buy_price = float(parts[1]) if len(parts) > 1 else 0
+        else:
+            symbol    = parts[0].upper() if len(parts) > 0 else ""
             amount    = float(parts[1]) if len(parts) > 1 else 0
             buy_price = float(parts[2]) if len(parts) > 2 else 0
+        if symbol:
             user["portfolio"][symbol] = {
                 "slug": resolve_slug(symbol), "amount": amount, "buy_price": buy_price,
             }
