@@ -1231,7 +1231,7 @@ async def button_callback(update, context):
         return
 
     # ── Portfolio ──────────────────────────────────────────────────────────────
-    if data == "portfolio":
+    elif data == "portfolio":
         user = get_user(uid)
         if not user.get("portfolio"):
             await query.edit_message_text(t(uid, "portfolio_empty"))
@@ -1799,11 +1799,6 @@ async def button_callback(update, context):
         back  = "⬅️ Inapoi" if lang == "ro" else "⬅️ Back"
         keyboard = [[InlineKeyboardButton(back, callback_data="help_settings")]]
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data == "help":
-        lang = get_user(uid).get("lang", "ro")
-        label = "Alege o categorie:" if lang == "ro" else "Choose a category:"
-        await query.edit_message_text(label, reply_markup=help_main_keyboard(lang))
 
     elif data == "help":
         lang = get_user(uid).get("lang", "ro")
