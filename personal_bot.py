@@ -528,7 +528,7 @@ def fng_bar(value):
     filled = value // 10
     return "█" * filled + "░" * (10 - filled)
 
-def format_stats_full(fg, global_data, prices):
+def format_stats_full(fg, global_data, prices, lang="ro"):
     utc_now = datetime.datetime.now(datetime.timezone.utc)
     year    = utc_now.year
     march_last = max(datetime.datetime(year, 3, day, 1, tzinfo=datetime.timezone.utc)
@@ -538,22 +538,32 @@ def format_stats_full(fg, global_data, prices):
     ro_offset  = datetime.timedelta(hours=3) if march_last <= utc_now < oct_last else datetime.timedelta(hours=2)
     ro_label   = "EEST" if march_last <= utc_now < oct_last else "EET"
     now        = (utc_now + ro_offset).strftime("%H:%M " + ro_label + " (%d.%m.%Y)")
-
     fng_val   = fg["value"]
     fng_trend = fng_val - fg["yesterday"]
-    trend_str = ("sus +" + str(fng_trend)) if fng_trend > 0 else (("jos " + str(fng_trend)) if fng_trend < 0 else "stabil")
+    if fng_trend > 0:
+        trend_str = ("sus +" if lang == "ro" else "up +") + str(fng_trend)
+    elif fng_trend < 0:
+        trend_str = ("jos " if lang == "ro" else "down ") + str(fng_trend)
+    else:
+        trend_str = "stabil" if lang == "ro" else "stable"
     bar = fng_bar(fng_val)
     if fng_val <= 25:   fe = "😱"
     elif fng_val <= 45: fe = "😰"
     elif fng_val <= 55: fe = "😐"
     elif fng_val <= 75: fe = "😄"
     else:               fe = "🤑"
-    if fng_val <= 20:   interp = "Panica extrema - zona istorica de acumulare"
-    elif fng_val <= 40: interp = "Frica in piata - posibila oportunitate"
-    elif fng_val <= 60: interp = "Piata neutra - asteapta confirmare"
-    elif fng_val <= 80: interp = "Lacomie - fii precaut"
-    else:               interp = "Euforie extrema - risc de corectie"
-
+    if lang == "ro":
+        if fng_val <= 20:   interp = "Panica extrema - zona istorica de acumulare"
+        elif fng_val <= 40: interp = "Frica in piata - posibila oportunitate"
+        elif fng_val <= 60: interp = "Piata neutra - asteapta confirmare"
+        elif fng_val <= 80: interp = "Lacomie - fii precaut"
+        else:               interp = "Euforie extrema - risc de corectie"
+    else:
+        if fng_val <= 20:   interp = "Extreme panic - historic accumulation zone"
+        elif fng_val <= 40: interp = "Fear in market - possible opportunity"
+        elif fng_val <= 60: interp = "Neutral market - wait for confirmation"
+        elif fng_val <= 80: interp = "Greed - be cautious"
+        else:               interp = "Extreme euphoria - correction risk"
     score = 5.0
     cap_chg = global_data.get("market_cap_change_24h", 0)
     btc_chg = prices.get("btc_change", 0)
@@ -568,36 +578,62 @@ def format_stats_full(fg, global_data, prices):
     if btc_chg > 3:    score += 0.5
     elif btc_chg < -3: score -= 0.5
     score = max(1, min(10, round(score)))
-    score_bar   = "X" * score + "." * (10 - score)
-    if score <= 3:   slabel = "Bearish"
-    elif score <= 4: slabel = "Slab Bearish"
-    elif score <= 6: slabel = "Neutru"
-    elif score <= 8: slabel = "Bullish"
-    else:            slabel = "Strong Bullish"
-
+    score_bar = "X" * score + "." * (10 - score)
+    if lang == "ro":
+        if score <= 3:   slabel = "Bearish"
+        elif score <= 4: slabel = "Slab Bearish"
+        elif score <= 6: slabel = "Neutru"
+        elif score <= 8: slabel = "Bullish"
+        else:            slabel = "Strong Bullish"
+    else:
+        if score <= 3:   slabel = "Bearish"
+        elif score <= 4: slabel = "Weak Bearish"
+        elif score <= 6: slabel = "Neutral"
+        elif score <= 8: slabel = "Bullish"
+        else:            slabel = "Strong Bullish"
     cap_a = "🟢" if cap_chg >= 0 else "🔴"
     btc_a = "🟢" if btc_chg >= 0 else "🔴"
     eth_a = "🟢" if prices.get("eth_change", 0) >= 0 else "🔴"
-
-    return (
-        "Market Stats - " + now + "\n\n"
-        "SENTIMENT PIATA\n"
-        + fe + " Fear & Greed: " + str(fng_val) + "/100 - " + fg["label"] + "\n"
-        "[" + bar + "]\n"
-        "Fata de ieri: " + trend_str + "\n"
-        "Media 7 zile: " + str(fg.get("week_avg", "N/A")) + "/100\n"
-        + interp + "\n\n"
-        "OVERVIEW PIATA\n"
-        "BTC:  " + fmt_price(prices.get("btc_price", 0)) + "  " + btc_a + " " + "{:.1f}%".format(abs(btc_chg)) + "\n"
-        "ETH:  " + fmt_price(prices.get("eth_price", 0)) + "  " + eth_a + " " + "{:.1f}%".format(abs(prices.get("eth_change", 0))) + "\n"
-        "Mkt Cap: " + fmt_large(global_data.get("total_market_cap", 0)) + "  " + cap_a + " " + "{:.1f}%".format(abs(cap_chg)) + "\n"
-        "Volum 24h: " + fmt_large(global_data.get("total_volume_24h", 0)) + "\n"
-        "BTC Dominance: " + str(global_data.get("btc_dominance", 0)) + "%\n"
-        "ETH Dominance: " + str(global_data.get("eth_dominance", 0)) + "%\n\n"
-        "MARKET SCORE: " + str(score) + "/10 - " + slabel + "\n"
-        "[" + score_bar + "]\n"
-        "Bazat pe: sentiment + trend + volum + dominance"
-    )
+    if lang == "ro":
+        return (
+            "Market Stats - " + now + "\n\n"
+            "SENTIMENT PIATA\n"
+            + fe + " Fear & Greed: " + str(fng_val) + "/100 - " + fg["label"] + "\n"
+            "[" + bar + "]\n"
+            "Fata de ieri: " + trend_str + "\n"
+            "Media 7 zile: " + str(fg.get("week_avg", "N/A")) + "/100\n"
+            + interp + "\n\n"
+            "OVERVIEW PIATA\n"
+            "BTC:  " + fmt_price(prices.get("btc_price", 0)) + "  " + btc_a + " " + "{:.1f}%".format(abs(btc_chg)) + "\n"
+            "ETH:  " + fmt_price(prices.get("eth_price", 0)) + "  " + eth_a + " " + "{:.1f}%".format(abs(prices.get("eth_change", 0))) + "\n"
+            "Mkt Cap: " + fmt_large(global_data.get("total_market_cap", 0)) + "  " + cap_a + " " + "{:.1f}%".format(abs(cap_chg)) + "\n"
+            "Volum 24h: " + fmt_large(global_data.get("total_volume_24h", 0)) + "\n"
+            "BTC Dominance: " + str(global_data.get("btc_dominance", 0)) + "%\n"
+            "ETH Dominance: " + str(global_data.get("eth_dominance", 0)) + "%\n\n"
+            "MARKET SCORE: " + str(score) + "/10 - " + slabel + "\n"
+            "[" + score_bar + "]\n"
+            "Bazat pe: sentiment + trend + volum + dominance"
+        )
+    else:
+        return (
+            "Market Stats - " + now + "\n\n"
+            "MARKET SENTIMENT\n"
+            + fe + " Fear & Greed: " + str(fng_val) + "/100 - " + fg["label"] + "\n"
+            "[" + bar + "]\n"
+            "vs yesterday: " + trend_str + "\n"
+            "7-day avg: " + str(fg.get("week_avg", "N/A")) + "/100\n"
+            + interp + "\n\n"
+            "MARKET OVERVIEW\n"
+            "BTC:  " + fmt_price(prices.get("btc_price", 0)) + "  " + btc_a + " " + "{:.1f}%".format(abs(btc_chg)) + "\n"
+            "ETH:  " + fmt_price(prices.get("eth_price", 0)) + "  " + eth_a + " " + "{:.1f}%".format(abs(prices.get("eth_change", 0))) + "\n"
+            "Mkt Cap: " + fmt_large(global_data.get("total_market_cap", 0)) + "  " + cap_a + " " + "{:.1f}%".format(abs(cap_chg)) + "\n"
+            "Volume 24h: " + fmt_large(global_data.get("total_volume_24h", 0)) + "\n"
+            "BTC Dominance: " + str(global_data.get("btc_dominance", 0)) + "%\n"
+            "ETH Dominance: " + str(global_data.get("eth_dominance", 0)) + "%\n\n"
+            "MARKET SCORE: " + str(score) + "/10 - " + slabel + "\n"
+            "[" + score_bar + "]\n"
+            "Based on: sentiment + trend + volume + dominance"
+        )
 
 # ─── PORTFOLIO HELPERS ─────────────────────────────────────────────────────────
 
@@ -1058,7 +1094,7 @@ async def cmd_stats(update, context):
     if not fg or not global_data or not prices:
         await msg.edit_text("Nu s-au putut obtine datele. Incearca din nou.")
         return
-    text = format_stats_full(fg, global_data, prices)
+    text = format_stats_full(fg, global_data, prices, lang)
     keyboard = [[InlineKeyboardButton("Refresh", callback_data="stats_full")]]
     await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
