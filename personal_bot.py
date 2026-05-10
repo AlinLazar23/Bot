@@ -166,7 +166,7 @@ def cache_set(key, data):
 
 # ─── COIN SLUG MAP ─────────────────────────────────────────────────────────────
 COIN_SLUG_MAP = {
-    "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
+    "BTC": "bitcoin", "VIRTUALS": "virtuals", "ETH": "ethereum", "SOL": "solana",
     "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
     "DOGE": "dogecoin", "DOT": "polkadot", "AVAX": "avalanche-2",
     "LINK": "chainlink", "LTC": "litecoin", "UNI": "uniswap",
@@ -188,7 +188,7 @@ def resolve_slug(symbol):
 # ─── MONEDE PREDEFINITE ────────────────────────────────────────────────────────
 # Adauga sau sterge monede din aceasta lista dupa preferinta
 PREDEFINED_COINS = [
-    "BTC", "ETH", "SOL", "BNB", "XRP",
+    "BTC", "VIRTUALS", "ETH", "SOL", "BNB", "XRP",
     "ADA", "DOGE", "AVAX", "LINK", "DOT",
     "MATIC", "NEAR", "ATOM", "ALGO", "TRX",
     "SUI", "ARB", "OP", "INJ", "FET",
