@@ -149,7 +149,6 @@ def get_user(uid):
 # ─── CACHE ─────────────────────────────────────────────────────────────────────
 _cache = {}
 CACHE_TTL = 180
-CACHE_TTL_STATS = 600  # 10 min pentru stats
 
 # State pentru ForceReply
 _user_state = {}
@@ -166,7 +165,7 @@ def cache_set(key, data):
 
 # ─── COIN SLUG MAP ─────────────────────────────────────────────────────────────
 COIN_SLUG_MAP = {
-    "BTC": "bitcoin", "VIRTUALS": "virtuals", "ETH": "ethereum", "SOL": "solana",
+    "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
     "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
     "DOGE": "dogecoin", "DOT": "polkadot", "AVAX": "avalanche-2",
     "LINK": "chainlink", "LTC": "litecoin", "UNI": "uniswap",
@@ -188,7 +187,7 @@ def resolve_slug(symbol):
 # ─── MONEDE PREDEFINITE ────────────────────────────────────────────────────────
 # Adauga sau sterge monede din aceasta lista dupa preferinta
 PREDEFINED_COINS = [
-    "BTC", "VIRTUALS", "ETH", "SOL", "BNB", "XRP",
+    "BTC", "ETH", "SOL", "BNB", "XRP",
     "ADA", "DOGE", "AVAX", "LINK", "DOT",
     "MATIC", "NEAR", "ATOM", "ALGO", "TRX",
     "SUI", "ARB", "OP", "INJ", "FET",
@@ -347,7 +346,7 @@ def get_fear_greed_stats():
                     "yesterday": int(data[1]["value"]) if len(data) > 1 else int(data[0]["value"]),
                     "week_avg":  round(sum(week_vals) / len(week_vals), 1),
                 }
-                _cache["fear_greed_stats"] = (result, time.time() - CACHE_TTL + CACHE_TTL_STATS)
+                cache_set("fear_greed_stats", result)
                 return result
     except Exception as e:
         logger.error("get_fear_greed_stats error: " + str(e))
@@ -422,7 +421,7 @@ def get_global_market():
         "eth_dominance":         round(d.get("market_cap_percentage", {}).get("eth", 0), 2),
         "market_cap_change_24h": d.get("market_cap_change_percentage_24h_usd", 0),
     }
-    _cache["global_market"] = (result, time.time() - CACHE_TTL + CACHE_TTL_STATS)
+    cache_set("global_market", result)
     return result
 
 def get_btc_eth_prices():
@@ -443,7 +442,7 @@ def get_btc_eth_prices():
         elif c["id"] == "ethereum":
             result["eth_price"]  = c.get("current_price", 0)
             result["eth_change"] = c.get("price_change_percentage_24h") or 0
-    _cache["btc_eth_prices"] = (result, time.time() - CACHE_TTL + CACHE_TTL_STATS)
+    cache_set("btc_eth_prices", result)
     return result
 
 def get_sector_coins(category_id, limit=15):
@@ -529,7 +528,7 @@ def fng_bar(value):
     filled = value // 10
     return "█" * filled + "░" * (10 - filled)
 
-def format_stats_full(fg, global_data, prices, lang):
+def format_stats_full(fg, global_data, prices, lang="ro"):
     utc_now = datetime.datetime.now(datetime.timezone.utc)
     year    = utc_now.year
     march_last = max(datetime.datetime(year, 3, day, 1, tzinfo=datetime.timezone.utc)
@@ -607,11 +606,12 @@ def format_stats_full(fg, global_data, prices, lang):
             "OVERVIEW PIATA\n"
             "BTC:  " + fmt_price(prices.get("btc_price", 0)) + "  " + btc_a + " " + "{:.1f}%".format(abs(btc_chg)) + "\n"
             "ETH:  " + fmt_price(prices.get("eth_price", 0)) + "  " + eth_a + " " + "{:.1f}%".format(abs(prices.get("eth_change", 0))) + "\n"
-            "Market Cap: " + fmt_large(global_data.get("total_market_cap", 0)) + "  " + cap_a + " " + "{:.1f}%".format(abs(cap_chg)) + "\n"
+            "Mkt Cap: " + fmt_large(global_data.get("total_market_cap", 0)) + "  " + cap_a + " " + "{:.1f}%".format(abs(cap_chg)) + "\n"
             "Volum 24h: " + fmt_large(global_data.get("total_volume_24h", 0)) + "\n"
             "BTC Dominance: " + str(global_data.get("btc_dominance", 0)) + "%\n"
             "ETH Dominance: " + str(global_data.get("eth_dominance", 0)) + "%\n\n"
             "MARKET SCORE: " + str(score) + "/10 - " + slabel + "\n"
+            "[" + score_bar + "]\n"
             "Bazat pe: sentiment + trend + volum + dominance"
         )
     else:
@@ -840,6 +840,7 @@ def get_help_keyboards(lang="ro"):
             "title": "📊 Rapoarte" if lang == "ro" else "📊 Reports",
             "keyboard": [
                 [InlineKeyboardButton("📊 Raport Acum" if lang == "ro" else "📊 Report Now", callback_data="exec_report")],
+                [InlineKeyboardButton("⏰ Seteaza Ora Raport" if lang == "ro" else "⏰ Set Report Time", callback_data="exec_set_report_menu")],
                 [InlineKeyboardButton(back, callback_data="help_back")],
             ]
         },
@@ -893,7 +894,6 @@ async def cmd_start(update, context):
     await update.message.reply_text(t(uid, "welcome"), reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def cmd_help(update, context):
-    uid  = update.effective_user.id
     lang = get_user(uid).get("lang", "ro")
     await update.message.reply_text("Alege o categorie:" if lang == "ro" else "Choose a category:", reply_markup=help_main_keyboard(lang))
 
@@ -952,8 +952,11 @@ async def cmd_portfolio(update, context):
             c["symbol"] + " x" + str(c["amount"]) + "\n"
             "  Value:  " + fmt_currency(c["current_value"], currency) + "\n"
             "  Price:  " + fmt_price(c["current_price"]) + "\n"
-            "  24h:    " + fmt_pct(c["change_24h"]) + "\n"  
+            "  24h:    " + fmt_pct(c["change_24h"]) + "\n"
+            "  P&L:    " + fmt_currency(c["pnl"], currency) + " (" + fmt_pct(c["pnl_pct"]) + ")\n"
         )
+    lines.append("\nTOTAL VALUE: " + fmt_currency(pf["total_value"], currency))
+    lines.append("TOTAL P&L:   " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
     keyboard = [[InlineKeyboardButton("Refresh", callback_data="portfolio")]]
     await update.message.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -1293,7 +1296,10 @@ async def button_callback(update, context):
                 "  Value:  " + fmt_currency(c["current_value"], currency) + "\n"
                 "  Price:  " + fmt_price(c["current_price"]) + "\n"
                 "  24h:    " + fmt_pct(c["change_24h"]) + "\n"
+                "  P&L:    " + fmt_currency(c["pnl"], currency) + " (" + fmt_pct(c["pnl_pct"]) + ")\n"
             )
+        lines.append("\nTOTAL VALUE: " + fmt_currency(pf["total_value"], currency))
+        lines.append("TOTAL P&L:   " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="portfolio")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -1361,7 +1367,10 @@ async def button_callback(update, context):
                 "  Value:  " + fmt_currency(c["current_value"], currency) + "\n"
                 "  Price:  " + fmt_price(c["current_price"]) + "\n"
                 "  24h:    " + fmt_pct(c["change_24h"]) + "\n"
+                "  P&L:    " + fmt_currency(c["pnl"], currency) + " (" + fmt_pct(c["pnl_pct"]) + ")\n"
             )
+        lines.append("\nTOTAL VALUE: " + fmt_currency(pf["total_value"], currency))
+        lines.append("TOTAL P&L:   " + fmt_currency(pf["total_pnl"], currency) + " (" + fmt_pct(pf["total_pnl_pct"]) + ")")
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_portfolio")],
                     [InlineKeyboardButton(back, callback_data="help_portfolio")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1474,13 +1483,21 @@ async def button_callback(update, context):
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_stats":
-        fg          = get_fear_greed_stats()
-        global_data = get_global_market()
-        prices      = get_btc_eth_prices()
+        fg = global_data = prices = None
+        for attempt in range(3):
+            if attempt > 0:
+                await asyncio.sleep(2)
+            fg          = get_fear_greed_stats()
+            time.sleep(0.5)
+            global_data = get_global_market()
+            time.sleep(0.5)
+            prices      = get_btc_eth_prices()
+            if fg and global_data and prices:
+                break
         if not fg or not global_data or not prices:
             await query.edit_message_text(t(uid, "no_data"), reply_markup=back_keyboard(lang))
             return
-        text = format_stats_full(fg, global_data, prices, lang)
+        text = format_stats_full(fg, global_data, prices)
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_stats")],
                     [InlineKeyboardButton(back, callback_data="help_market")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1755,6 +1772,33 @@ async def button_callback(update, context):
                     "Fear & Greed alert set!\n\nYou will be notified when Fear & Greed drops below " + str(int(threshold)) + ".")
         await query.edit_message_text(msg_fear, reply_markup=InlineKeyboardMarkup(keyboard))
 
+    # ── Set Report ────────────────────────────────────────────────────────────
+    elif data == "exec_set_report_menu":
+        rows = [
+            [InlineKeyboardButton("06:00", callback_data="set_report:06:00"),
+             InlineKeyboardButton("07:00", callback_data="set_report:07:00"),
+             InlineKeyboardButton("08:00", callback_data="set_report:08:00"),
+             InlineKeyboardButton("09:00", callback_data="set_report:09:00")],
+            [InlineKeyboardButton("10:00", callback_data="set_report:10:00"),
+             InlineKeyboardButton("18:00", callback_data="set_report:18:00"),
+             InlineKeyboardButton("20:00", callback_data="set_report:20:00"),
+             InlineKeyboardButton("22:00", callback_data="set_report:22:00")],
+            [InlineKeyboardButton(back, callback_data="help_reports")],
+        ]
+        title = "Alege ora raportului zilnic:" if lang == "ro" else "Choose daily report time:"
+        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
+
+    elif data.startswith("set_report:"):
+        time_str = data.split(":", 1)[1]
+        user = get_user(uid)
+        user["report_time"]    = time_str
+        user["report_enabled"] = True
+        save_data()
+        msg = ("Raportul zilnic va fi trimis la " + time_str if lang == "ro"
+               else "Daily report will be sent at " + time_str)
+        keyboard = [[InlineKeyboardButton(back, callback_data="help_reports")]]
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
     # ── Settings ───────────────────────────────────────────────────────────────
     elif data.startswith("exec_lang_"):
         new_lang = data.split("_")[-1]
@@ -1794,8 +1838,7 @@ async def button_callback(update, context):
         if not fg or not global_data or not prices:
             await query.edit_message_text(t(uid, "no_data"))
             return
-        lang_cb = get_user(uid).get("lang", "ro") if "uid" in dir() else "ro"
-        text = format_stats_full(fg, global_data, prices, lang_cb)
+        text = format_stats_full(fg, global_data, prices)
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="stats_full")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -1838,7 +1881,6 @@ async def button_callback(update, context):
 
 
 async def check_technical_alerts(context):
-    await asyncio.sleep(0)  # yield control
     fg = get_fear_greed(fresh=True)
     if fg:
         logger.info("Fear & Greed check: " + str(fg["value"]))
