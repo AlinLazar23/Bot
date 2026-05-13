@@ -108,26 +108,7 @@ def t(uid, key, *args):
 
 # ─── USER DATA ─────────────────────────────────────────────────────────────────
 
-JSONBIN_API_KEY = os.environ.get("JSONBIN_API_KEY", "")
-JSONBIN_BIN_ID  = os.environ.get("JSONBIN_BIN_ID", "")
-JSONBIN_URL     = "https://api.jsonbin.io/v3/b/"
-
 def load_data():
-    # Try JSONBin first
-    if JSONBIN_API_KEY and JSONBIN_BIN_ID:
-        try:
-            r = requests.get(
-                JSONBIN_URL + JSONBIN_BIN_ID + "/latest",
-                headers={"X-Master-Key": JSONBIN_API_KEY},
-                timeout=10,
-            )
-            if r.status_code == 200:
-                raw = r.json().get("record", {})
-                logger.info("Data loaded from JSONBin")
-                return {int(k): v for k, v in raw.items()}
-        except Exception as e:
-            logger.error("JSONBin load error: " + str(e))
-    # Fallback to local file
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r") as f:
@@ -138,24 +119,6 @@ def load_data():
     return {}
 
 def save_data():
-    # Save to JSONBin
-    if JSONBIN_API_KEY and JSONBIN_BIN_ID:
-        try:
-            r = requests.put(
-                JSONBIN_URL + JSONBIN_BIN_ID,
-                json=user_data,
-                headers={
-                    "X-Master-Key": JSONBIN_API_KEY,
-                    "Content-Type": "application/json",
-                },
-                timeout=10,
-            )
-            if r.status_code == 200:
-                return
-            logger.error("JSONBin save error: " + str(r.status_code))
-        except Exception as e:
-            logger.error("JSONBin save error: " + str(e))
-    # Fallback to local file
     try:
         with open(DATA_FILE, "w") as f:
             json.dump(user_data, f, indent=2)
@@ -930,6 +893,7 @@ async def cmd_start(update, context):
     await update.message.reply_text(t(uid, "welcome"), reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def cmd_help(update, context):
+    uid  = update.effective_user.id
     lang = get_user(uid).get("lang", "ro")
     await update.message.reply_text("Alege o categorie:" if lang == "ro" else "Choose a category:", reply_markup=help_main_keyboard(lang))
 
@@ -1131,7 +1095,8 @@ async def cmd_stats(update, context):
     if not fg or not global_data or not prices:
         await msg.edit_text("Nu s-au putut obtine datele. Incearca din nou.")
         return
-    text = format_stats_full(fg, global_data, prices, lang)
+    lang_s = get_user(update.effective_user.id).get("lang", "ro")
+    text = format_stats_full(fg, global_data, prices, lang_s)
     keyboard = [[InlineKeyboardButton("Refresh", callback_data="stats_full")]]
     await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
