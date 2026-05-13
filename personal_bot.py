@@ -210,7 +210,7 @@ COIN_SLUG_MAP = {
     "FET": "fetch-ai", "ICP": "internet-computer",
     "FIL": "filecoin", "VET": "vechain", "SEI": "sei-network",
     "TIA": "celestia", "GRT": "the-graph", "EGLD": "elrond-erd-2",
-    "HYPE": "hyperliquid", "GALA": "gala", "VIRTUAL": "virtual",
+    "HYPE": "hyperliquid", "GALA": "gala", "VIRTUAL": "virtuals-protocol",
 }
 
 def resolve_slug(symbol):
