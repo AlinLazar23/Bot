@@ -675,27 +675,48 @@ def calculate_portfolio(uid):
     portfolio = user.get("portfolio", {})
     if not portfolio:
         return None
+
+    # Batch request pentru toate monedele dintr-o data
+    slugs = [info.get("slug", resolve_slug(symbol)) for symbol, info in portfolio.items()]
+    prices_data = {}
+    try:
+        r = requests.get(
+            COINGECKO_BASE + "/simple/price",
+            params={
+                "ids": ",".join(slugs),
+                "vs_currencies": "usd",
+                "include_24hr_change": "true",
+            },
+            timeout=10,
+            headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
+        )
+        if r.status_code == 200:
+            prices_data = r.json()
+    except Exception as e:
+        logger.error("portfolio batch error: " + str(e))
+
     total_value = total_invested = 0
     coins_data  = []
     for symbol, info in portfolio.items():
-        slug       = info.get("slug", resolve_slug(symbol))
-        amount     = float(info.get("amount", 0))
-        buy_price  = float(info.get("buy_price", 0))
-        price_data = get_price(slug)
-        if not price_data:
+        slug      = info.get("slug", resolve_slug(symbol))
+        amount    = float(info.get("amount", 0))
+        buy_price = float(info.get("buy_price", 0))
+        pd        = prices_data.get(slug, {})
+        if not pd:
             continue
-        cur_price  = price_data["price"]
-        cur_val    = amount * cur_price
-        invested   = amount * buy_price
-        pnl        = cur_val - invested
-        pnl_pct    = ((cur_price - buy_price) / buy_price * 100) if buy_price > 0 else 0
+        cur_price = pd.get("usd", 0)
+        change_24h = pd.get("usd_24h_change", 0)
+        cur_val   = amount * cur_price
+        invested  = amount * buy_price
+        pnl       = cur_val - invested
+        pnl_pct   = ((cur_price - buy_price) / buy_price * 100) if buy_price > 0 else 0
         total_value    += cur_val
         total_invested += invested
         coins_data.append({
             "symbol": symbol, "amount": amount, "buy_price": buy_price,
             "current_price": cur_price, "current_value": cur_val,
             "invested": invested, "pnl": pnl, "pnl_pct": pnl_pct,
-            "change_24h": price_data.get("change_24h", 0),
+            "change_24h": change_24h,
         })
     total_pnl     = total_value - total_invested
     total_pnl_pct = ((total_pnl / total_invested) * 100) if total_invested > 0 else 0
