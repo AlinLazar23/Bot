@@ -108,7 +108,24 @@ def t(uid, key, *args):
 
 # ─── USER DATA ─────────────────────────────────────────────────────────────────
 
+JSONBIN_API_KEY = os.environ.get("JSONBIN_API_KEY", "")
+JSONBIN_BIN_ID  = os.environ.get("JSONBIN_BIN_ID", "")
+JSONBIN_URL     = "https://api.jsonbin.io/v3/b/"
+
 def load_data():
+    if JSONBIN_API_KEY and JSONBIN_BIN_ID:
+        try:
+            r = requests.get(
+                JSONBIN_URL + JSONBIN_BIN_ID + "/latest",
+                headers={"X-Master-Key": JSONBIN_API_KEY},
+                timeout=10,
+            )
+            if r.status_code == 200:
+                raw = r.json().get("record", {})
+                logger.info("Data loaded from JSONBin")
+                return {int(k): v for k, v in raw.items() if k != "init"}
+        except Exception as e:
+            logger.error("JSONBin load error: " + str(e))
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r") as f:
@@ -119,6 +136,22 @@ def load_data():
     return {}
 
 def save_data():
+    if JSONBIN_API_KEY and JSONBIN_BIN_ID:
+        try:
+            r = requests.put(
+                JSONBIN_URL + JSONBIN_BIN_ID,
+                json=user_data,
+                headers={
+                    "X-Master-Key": JSONBIN_API_KEY,
+                    "Content-Type": "application/json",
+                },
+                timeout=10,
+            )
+            if r.status_code == 200:
+                return
+            logger.error("JSONBin save error: " + str(r.status_code))
+        except Exception as e:
+            logger.error("JSONBin save error: " + str(e))
     try:
         with open(DATA_FILE, "w") as f:
             json.dump(user_data, f, indent=2)
@@ -2009,6 +2042,8 @@ def main():
     app.job_queue.run_repeating(check_daily_reports,    interval=60,             first=30)
 
     print("CryptoPersonal Bot running...")
+    print("JSONBIN_API_KEY set:", bool(JSONBIN_API_KEY))
+    print("JSONBIN_BIN_ID set:", bool(JSONBIN_BIN_ID))
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
