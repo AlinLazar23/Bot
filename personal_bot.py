@@ -108,7 +108,26 @@ def t(uid, key, *args):
 
 # ─── USER DATA ─────────────────────────────────────────────────────────────────
 
+JSONBIN_API_KEY = os.environ.get("JSONBIN_API_KEY", "")
+JSONBIN_BIN_ID  = os.environ.get("JSONBIN_BIN_ID", "")
+JSONBIN_URL     = "https://api.jsonbin.io/v3/b/"
+
 def load_data():
+    # Try JSONBin first
+    if JSONBIN_API_KEY and JSONBIN_BIN_ID:
+        try:
+            r = requests.get(
+                JSONBIN_URL + JSONBIN_BIN_ID + "/latest",
+                headers={"X-Master-Key": JSONBIN_API_KEY},
+                timeout=10,
+            )
+            if r.status_code == 200:
+                raw = r.json().get("record", {})
+                logger.info("Data loaded from JSONBin")
+                return {int(k): v for k, v in raw.items()}
+        except Exception as e:
+            logger.error("JSONBin load error: " + str(e))
+    # Fallback to local file
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r") as f:
@@ -119,6 +138,24 @@ def load_data():
     return {}
 
 def save_data():
+    # Save to JSONBin
+    if JSONBIN_API_KEY and JSONBIN_BIN_ID:
+        try:
+            r = requests.put(
+                JSONBIN_URL + JSONBIN_BIN_ID,
+                json=user_data,
+                headers={
+                    "X-Master-Key": JSONBIN_API_KEY,
+                    "Content-Type": "application/json",
+                },
+                timeout=10,
+            )
+            if r.status_code == 200:
+                return
+            logger.error("JSONBin save error: " + str(r.status_code))
+        except Exception as e:
+            logger.error("JSONBin save error: " + str(e))
+    # Fallback to local file
     try:
         with open(DATA_FILE, "w") as f:
             json.dump(user_data, f, indent=2)
@@ -840,7 +877,6 @@ def get_help_keyboards(lang="ro"):
             "title": "📊 Rapoarte" if lang == "ro" else "📊 Reports",
             "keyboard": [
                 [InlineKeyboardButton("📊 Raport Acum" if lang == "ro" else "📊 Report Now", callback_data="exec_report")],
-                [InlineKeyboardButton("⏰ Seteaza Ora Raport" if lang == "ro" else "⏰ Set Report Time", callback_data="exec_set_report_menu")],
                 [InlineKeyboardButton(back, callback_data="help_back")],
             ]
         },
@@ -1771,33 +1807,6 @@ async def button_callback(update, context):
                     if lang == "ro" else
                     "Fear & Greed alert set!\n\nYou will be notified when Fear & Greed drops below " + str(int(threshold)) + ".")
         await query.edit_message_text(msg_fear, reply_markup=InlineKeyboardMarkup(keyboard))
-
-    # ── Set Report ────────────────────────────────────────────────────────────
-    elif data == "exec_set_report_menu":
-        rows = [
-            [InlineKeyboardButton("06:00", callback_data="set_report:06:00"),
-             InlineKeyboardButton("07:00", callback_data="set_report:07:00"),
-             InlineKeyboardButton("08:00", callback_data="set_report:08:00"),
-             InlineKeyboardButton("09:00", callback_data="set_report:09:00")],
-            [InlineKeyboardButton("10:00", callback_data="set_report:10:00"),
-             InlineKeyboardButton("18:00", callback_data="set_report:18:00"),
-             InlineKeyboardButton("20:00", callback_data="set_report:20:00"),
-             InlineKeyboardButton("22:00", callback_data="set_report:22:00")],
-            [InlineKeyboardButton(back, callback_data="help_reports")],
-        ]
-        title = "Alege ora raportului zilnic:" if lang == "ro" else "Choose daily report time:"
-        await query.edit_message_text(title, reply_markup=InlineKeyboardMarkup(rows))
-
-    elif data.startswith("set_report:"):
-        time_str = data.split(":", 1)[1]
-        user = get_user(uid)
-        user["report_time"]    = time_str
-        user["report_enabled"] = True
-        save_data()
-        msg = ("Raportul zilnic va fi trimis la " + time_str if lang == "ro"
-               else "Daily report will be sent at " + time_str)
-        keyboard = [[InlineKeyboardButton(back, callback_data="help_reports")]]
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
     # ── Settings ───────────────────────────────────────────────────────────────
     elif data.startswith("exec_lang_"):
