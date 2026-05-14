@@ -204,7 +204,7 @@ COIN_SLUG_MAP = {
     "LINK": "chainlink", "ALGO": "algorand",
     "SUI": "sui", "ARB": "arbitrum",
     "FET": "fetch-ai", "EGLD": "elrond-erd-2",
-    "HYPE": "hyperliquid", "VIRTUAL": "virtuals-protocol",
+    "HYPE": "hyperliquid", "VIRTUAL": "virtual-protocol",
 }
 
 def resolve_slug(symbol):
