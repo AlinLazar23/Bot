@@ -201,16 +201,10 @@ COIN_SLUG_MAP = {
     "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
     "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
     "DOGE": "dogecoin", "DOT": "polkadot", "AVAX": "avalanche-2",
-    "LINK": "chainlink", "LTC": "litecoin", "UNI": "uniswap",
-    "XLM": "stellar", "TRX": "tron", "SHIB": "shiba-inu",
-    "MATIC": "matic-network", "NEAR": "near", "ATOM": "cosmos",
-    "FTM": "fantom", "ALGO": "algorand", "XMR": "monero",
-    "PEPE": "pepe", "SUI": "sui", "APT": "aptos",
-    "ARB": "arbitrum", "OP": "optimism", "INJ": "injective-protocol",
-    "FET": "fetch-ai", "ICP": "internet-computer",
-    "FIL": "filecoin", "VET": "vechain", "SEI": "sei-network",
-    "TIA": "celestia", "GRT": "the-graph", "EGLD": "elrond-erd-2",
-    "HYPE": "hyperliquid", "GALA": "gala",
+    "LINK": "chainlink", "ALGO": "algorand",
+    "SUI": "sui", "ARB": "arbitrum",
+    "FET": "fetch-ai", "EGLD": "elrond-erd-2",
+    "HYPE": "hyperliquid", "VIRTUAL": "virtuals-protocol",
 }
 
 def resolve_slug(symbol):
@@ -222,10 +216,8 @@ def resolve_slug(symbol):
 PREDEFINED_COINS = [
     "BTC", "ETH", "SOL", "BNB", "XRP",
     "ADA", "DOGE", "AVAX", "LINK", "DOT",
-    "MATIC", "NEAR", "ATOM", "ALGO", "TRX",
-    "SUI", "ARB", "OP", "INJ", "FET",
-    "PEPE", "HYPE", "ICP", "FIL", "VET",
-    "SEI", "TIA", "GRT", "EGLD", "GALA",
+    "ALGO", "SUI", "ARB", "FET",
+    "HYPE", "EGLD", "VIRTUAL",
 ]
 # ─── SECTOARE ──────────────────────────────────────────────────────────────────
 SECTORS = {
