@@ -210,7 +210,7 @@ COIN_SLUG_MAP = {
     "FET": "fetch-ai", "ICP": "internet-computer",
     "FIL": "filecoin", "VET": "vechain", "SEI": "sei-network",
     "TIA": "celestia", "GRT": "the-graph", "EGLD": "elrond-erd-2",
-    "HYPE": "hyperliquid", "GALA": "gala", "VIRTUAL": "virtuals-protocol",
+    "HYPE": "hyperliquid", "GALA": "gala",
 }
 
 def resolve_slug(symbol):
@@ -225,7 +225,7 @@ PREDEFINED_COINS = [
     "MATIC", "NEAR", "ATOM", "ALGO", "TRX",
     "SUI", "ARB", "OP", "INJ", "FET",
     "PEPE", "HYPE", "ICP", "FIL", "VET",
-    "SEI", "TIA", "GRT", "EGLD", "GALA", "VIRTUAL"
+    "SEI", "TIA", "GRT", "EGLD", "GALA",
 ]
 # ─── SECTOARE ──────────────────────────────────────────────────────────────────
 SECTORS = {
