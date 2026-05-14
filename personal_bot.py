@@ -198,13 +198,26 @@ def cache_set(key, data):
 
 # ─── COIN SLUG MAP ─────────────────────────────────────────────────────────────
 COIN_SLUG_MAP = {
-    "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana",
-    "BNB": "binancecoin", "XRP": "ripple", "ADA": "cardano",
-    "DOGE": "dogecoin", "DOT": "polkadot", "AVAX": "avalanche-2",
-    "LINK": "chainlink", "ALGO": "algorand",
-    "SUI": "sui", "ARB": "arbitrum",
-    "FET": "fetch-ai", "EGLD": "elrond-erd-2",
-    "HYPE": "hyperliquid", "VIRTUAL": "virtual-protocol",
+    # Core
+    "BTC": "bitcoin",           "ETH": "ethereum",          "SOL": "solana",
+    "BNB": "binancecoin",       "XRP": "ripple",             "ADA": "cardano",
+    "DOGE": "dogecoin",         "DOT": "polkadot",           "AVAX": "avalanche-2",
+    "LINK": "chainlink",        "ALGO": "algorand",          "SUI": "sui",
+    "ARB": "arbitrum",          "FET": "fetch-ai",           "EGLD": "elrond-erd-2",
+    "HYPE": "hyperliquid",      "VIRTUAL": "virtual-protocol",
+    # Top 100 CoinGecko
+    "ZEC": "zcash",             "XMR": "monero",             "TON": "the-open-network",
+    "XLM": "stellar",           "LTC": "litecoin",           "DAI": "dai",
+    "HBAR": "hedera-hashgraph", "SHIB": "shiba-inu",         "CRO": "crypto-com-chain",
+    "TAO": "bittensor",         "UNI": "uniswap",            "MNT": "mantle",
+    "NEAR": "near",             "ONDO": "ondo-finance",      "OKB": "okb",
+    "ICP": "internet-computer", "AAVE": "aave",              "ETC": "ethereum-classic",
+    "QNT": "quant-network",     "ENA": "ethena",             "ATOM": "cosmos",
+    "KAS": "kaspa",             "POL": "polygon-ecosystem-token", "RENDER": "render-token",
+    "WLD": "worldcoin-wld",     "APT": "aptos",              "FIL": "filecoin",
+    "JUP": "jupiter-exchange-solana", "VET": "vechain",      "BONK": "bonk",
+    "PENGU": "pudgy-penguins",  "ASTER": "aster-2",          "PUMP": "pump-fun",
+    "WLFI": "world-liberty-financial",
 }
 
 def resolve_slug(symbol):
@@ -214,10 +227,18 @@ def resolve_slug(symbol):
 # ─── MONEDE PREDEFINITE ────────────────────────────────────────────────────────
 # Adauga sau sterge monede din aceasta lista dupa preferinta
 PREDEFINED_COINS = [
-    "BTC", "ETH", "SOL", "BNB", "XRP",
-    "ADA", "DOGE", "AVAX", "LINK", "DOT",
-    "ALGO", "SUI", "ARB", "FET",
-    "HYPE", "EGLD", "VIRTUAL",
+    "BTC",  "ETH",  "SOL",   "BNB",   "XRP",
+    "ADA",  "DOGE", "AVAX",  "LINK",  "DOT",
+    "ALGO", "SUI",  "ARB",   "FET",   "HYPE",
+    "EGLD", "VIRTUAL",
+    # Top 100
+    "ZEC",  "XMR",  "TON",   "XLM",   "LTC",
+    "DAI",  "HBAR", "SHIB",  "CRO",   "TAO",
+    "UNI",  "MNT",  "NEAR",  "ONDO",  "OKB",
+    "ICP",  "AAVE", "ETC",   "QNT",   "ENA",
+    "ATOM", "KAS",  "POL",   "RENDER","WLD",
+    "APT",  "FIL",  "JUP",   "VET",   "BONK",
+    "PENGU","ASTER","PUMP",  "WLFI",
 ]
 # ─── SECTOARE ──────────────────────────────────────────────────────────────────
 SECTORS = {
