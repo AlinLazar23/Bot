@@ -181,7 +181,8 @@ def get_user(uid):
 
 # ─── CACHE ─────────────────────────────────────────────────────────────────────
 _cache = {}
-CACHE_TTL = 180
+CACHE_TTL     = 300
+CACHE_TTL_EMA = 600
 
 # State pentru ForceReply
 _user_state = {}
@@ -400,9 +401,10 @@ def get_fear_greed_stats():
 
 def get_ema(slug, period=200, timeframe="daily"):
     cache_key = "ema:" + slug + ":" + str(period) + ":" + timeframe
-    cached = cache_get(cache_key)
-    if cached is not None:
-        return cached
+    if cache_key in _cache:
+        data, ts = _cache[cache_key]
+        if time.time() - ts < CACHE_TTL_EMA:
+            return data
     try:
         data = cg_get("/coins/" + slug + "/market_chart",
                       params={"vs_currency": "usd", "days": "365", "interval": "daily"})
@@ -1211,8 +1213,8 @@ async def cmd_alert_ema(update, context):
         return
     slug = resolve_slug(symbol)
     await update.message.reply_text("Se calculeaza EMA...")
-    ema   = get_ema(slug, period, "daily")
-    price = get_current_price_simple(slug)
+    ema   = await asyncio.to_thread(get_ema, slug, period, "daily")
+    price = await asyncio.to_thread(get_current_price_simple, slug)
     if ema is None:
         await update.message.reply_text("Nu s-a putut calcula EMA pentru " + symbol + ".")
         return
@@ -1777,8 +1779,8 @@ async def button_callback(update, context):
         slug  = resolve_slug(coin)
         msg_calc = "Se calculeaza EMA200 pentru " + coin + "..." if lang == "ro" else "Calculating EMA200 for " + coin + "..."
         await query.edit_message_text(msg_calc)
-        ema   = get_ema(slug, 200, "daily")
-        price = get_current_price_simple(slug)
+        ema   = await asyncio.to_thread(get_ema, slug, 200, "daily")
+        price = await asyncio.to_thread(get_current_price_simple, slug)
         if ema is None:
             keyboard = [[InlineKeyboardButton(back, callback_data="exec_alert_ema_menu")]]
             err = ("Nu s-a putut calcula EMA pentru " + coin + "." if lang == "ro"
@@ -1957,9 +1959,9 @@ async def check_technical_alerts(context):
             timeframe = info["timeframe"]
             symbol    = info["symbol"]
             old_pos   = info.get("position", "above")
-            ema       = get_ema(slug, period, timeframe)
-            price     = get_current_price_simple(slug)
-            time.sleep(0.5)
+            ema       = await asyncio.to_thread(get_ema, slug, period, timeframe)
+            price     = await asyncio.to_thread(get_current_price_simple, slug)
+            await asyncio.sleep(0.3)
             if ema is None or price is None:
                 continue
             new_pos      = "above" if price > ema else "below"
