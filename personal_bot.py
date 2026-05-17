@@ -677,7 +677,6 @@ def format_stats_full(fg, global_data, prices, lang="ro"):
             "BTC Dominance: " + str(global_data.get("btc_dominance", 0)) + "%\n"
             "ETH Dominance: " + str(global_data.get("eth_dominance", 0)) + "%\n\n"
             "MARKET SCORE: " + str(score) + "/10 - " + slabel + "\n"
-            "[" + score_bar + "]\n"
             "Bazat pe: sentiment + trend + volum + dominance"
         )
     else:
@@ -697,7 +696,6 @@ def format_stats_full(fg, global_data, prices, lang="ro"):
             "BTC Dominance: " + str(global_data.get("btc_dominance", 0)) + "%\n"
             "ETH Dominance: " + str(global_data.get("eth_dominance", 0)) + "%\n\n"
             "MARKET SCORE: " + str(score) + "/10 - " + slabel + "\n"
-            "[" + score_bar + "]\n"
             "Based on: sentiment + trend + volume + dominance"
         )
 
