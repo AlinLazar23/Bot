@@ -821,25 +821,12 @@ async def generate_report(uid):
     watchlist = user.get("watchlist", [])
     if watchlist:
         lines.append("WATCHLIST")
-        for symbol in watchlist[:5]:
+        for symbol in watchlist:
             pd = get_price(resolve_slug(symbol))
             time.sleep(0.3)
             if pd:
                 lines.append(symbol + ": " + fmt_price(pd["price"]) + " | " + fmt_pct(pd.get("change_24h", 0)))
         lines.append("")
-
-    signals = []
-    for symbol in list(set(list(user.get("portfolio", {}).keys()) + user.get("watchlist", [])))[:5]:
-        slug  = resolve_slug(symbol)
-        ema   = get_ema(slug, 200, "daily")
-        price = get_current_price_simple(slug)
-        time.sleep(0.5)
-        if ema and price:
-            pos   = "above" if price > ema else "below"
-            emoji = "🟢" if pos == "above" else "🔴"
-            signals.append(symbol + " EMA200: " + emoji + " " + pos.upper() + " (" + fmt_price(ema) + ")")
-    if signals:
-        lines += [("SEMNALE TEHNICE" if lang == "ro" else "TECHNICAL SIGNALS")] + signals + [""]
 
     lines += ["---", "/portfolio | /watchlist | /risk"]
     return "\n".join(lines)
