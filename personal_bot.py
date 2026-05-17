@@ -1331,8 +1331,7 @@ async def cmd_risk(update, context):
     lang2 = get_user(uid).get("lang", "ro")
     pf    = calculate_portfolio(uid)
     score, label, notes = calculate_risk_score(pf, lang2)
-    bar   = "X" * score + "." * (10 - score)
-    lines = [t(uid, "risk_title") + "\n", "Score: " + str(score) + "/10 - " + label, "[" + bar + "]\n"]
+    lines = [t(uid, "risk_title") + "\n", "Score: " + str(score) + "/10 - " + label + "\n"]
     for note in notes:
         lines.append("- " + note)
     await update.message.reply_text("\n".join(lines))
@@ -1483,8 +1482,7 @@ async def button_callback(update, context):
             return
         pf    = calculate_portfolio(uid)
         score, label, notes = calculate_risk_score(pf, lang)
-        bar   = "X" * score + "." * (10 - score)
-        lines = [t(uid, "risk_title") + "\n", "Score: " + str(score) + "/10 - " + label, "[" + bar + "]\n"]
+        lines = [t(uid, "risk_title") + "\n", "Score: " + str(score) + "/10 - " + label + "\n"]
         for note in notes:
             lines.append("- " + note)
         keyboard = [[InlineKeyboardButton(back, callback_data="help_portfolio")]]
