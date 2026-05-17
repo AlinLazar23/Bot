@@ -1069,7 +1069,7 @@ async def cmd_watchlist(update, context):
 async def cmd_whales(update, context):
     uid = update.effective_user.id
     await update.message.reply_text(t(uid, "loading"))
-    txs = get_whale_transactions()
+    txs = await asyncio.to_thread(get_whale_transactions)
     if not txs:
         await update.message.reply_text(t(uid, "no_whales"))
         return
@@ -1524,7 +1524,7 @@ async def button_callback(update, context):
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif data == "exec_whales":
-        txs = get_whale_transactions()
+        txs = await asyncio.to_thread(get_whale_transactions)
         if not txs:
             await query.edit_message_text(t(uid, "no_whales"), reply_markup=back_keyboard(lang))
             return
