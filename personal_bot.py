@@ -35,12 +35,9 @@ from telegram.ext import (
 # ─── CONFIG ────────────────────────────────────────────────────────────────────
 BOT_TOKEN      = os.environ.get("BOT_TOKEN", "")
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
-WHALE_API      = "https://api.whale-alert.io/v1/transactions"
-WHALE_API_KEY  = os.environ.get("WHALE_API_KEY", "")
 DATA_DIR       = "/data" if os.path.isdir("/data") else "."
 DATA_FILE      = os.path.join(DATA_DIR, "user_data.json")
 CHECK_INTERVAL = 60
-WHALE_MIN_USD  = 1000000
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -65,8 +62,6 @@ T = {
         "currency_set":       "Moneda setata: {}",
         "report_set":         "Raportul zilnic va fi trimis la {}",
         "report_title":       "Raport Zilnic Personal",
-        "whales_title":       "Tranzactii Balene (>$1M)",
-        "no_whales":          "Nu au fost detectate tranzactii mari recent.",
         "alert_fear_set":     "Alerta Fear & Greed setata: sub {}",
         "alerts_empty":       "Nu ai alerte active.",
         "pnl_empty":          "Nu ai monede in portofoliu pentru P&L.",
@@ -86,8 +81,6 @@ T = {
         "currency_set":       "Currency set: {}",
         "report_set":         "Daily report will be sent at {}",
         "report_title":       "Daily Personal Report",
-        "whales_title":       "Whale Transactions (>$1M)",
-        "no_whales":          "No large transactions detected recently.",
         "alert_fear_set":     "Fear & Greed alert set: below {}",
         "alerts_empty":       "You have no active alerts.",
         "pnl_empty":          "No coins in portfolio for P&L.",
@@ -544,50 +537,6 @@ def get_sector_coins(category_id, limit=15):
         logger.error("get_sector_coins error: " + str(e))
     return []
 
-def get_whale_transactions():
-    cached = cache_get("whales")
-    if cached is not None:
-        return cached
-    transactions = []
-    if WHALE_API_KEY:
-        try:
-            r = requests.get(WHALE_API, params={
-                "api_key": WHALE_API_KEY, "min_value": WHALE_MIN_USD,
-                "limit": 10, "start": int(time.time()) - 3600,
-            }, timeout=10)
-            if r.status_code == 200:
-                for tx in r.json().get("transactions", []):
-                    transactions.append({
-                        "symbol":    tx.get("symbol", "").upper(),
-                        "value_usd": tx.get("amount_usd", 0),
-                        "from":      tx.get("from", {}).get("owner_type", "unknown"),
-                        "to":        tx.get("to", {}).get("owner_type", "unknown"),
-                    })
-        except Exception as e:
-            logger.error("whale API error: " + str(e))
-    else:
-        try:
-            data = cg_get("/coins/markets", params={
-                "vs_currency": "usd",
-                "ids": "bitcoin,ethereum,binancecoin,ripple,solana",
-                "order": "volume_desc", "per_page": 5, "page": 1, "sparkline": "false",
-            })
-            if data:
-                for c in data:
-                    vol = c.get("total_volume", 0)
-                    if vol > WHALE_MIN_USD * 100:
-                        transactions.append({
-                            "symbol":    c["symbol"].upper(),
-                            "value_usd": vol,
-                            "from":      "market",
-                            "to":        "market",
-                            "note":      "High volume activity",
-                        })
-        except Exception as e:
-            logger.error("whale fallback error: " + str(e))
-    cache_set("whales", transactions)
-    return transactions
-
 # ─── STATS FORMAT ──────────────────────────────────────────────────────────────
 
 def fng_bar(value):
@@ -807,8 +756,7 @@ def help_main_keyboard(lang="ro"):
             [InlineKeyboardButton("🔔 Alerte",      callback_data="help_alerts"),
              InlineKeyboardButton("📊 Rapoarte",    callback_data="help_reports")],
             [InlineKeyboardButton("📈 Piata",       callback_data="help_market"),
-             InlineKeyboardButton("🐋 Balene",      callback_data="help_whales")],
-            [InlineKeyboardButton("⚙️ Setari",      callback_data="help_settings")],
+             InlineKeyboardButton("⚙️ Setari",      callback_data="help_settings")],
         ])
     else:
         return InlineKeyboardMarkup([
@@ -817,8 +765,7 @@ def help_main_keyboard(lang="ro"):
             [InlineKeyboardButton("🔔 Alerts",      callback_data="help_alerts"),
              InlineKeyboardButton("📊 Reports",     callback_data="help_reports")],
             [InlineKeyboardButton("📈 Market",      callback_data="help_market"),
-             InlineKeyboardButton("🐋 Whales",      callback_data="help_whales")],
-            [InlineKeyboardButton("⚙️ Settings",    callback_data="help_settings")],
+             InlineKeyboardButton("⚙️ Settings",    callback_data="help_settings")],
         ])
 
 def back_keyboard(lang="ro"):
@@ -873,13 +820,6 @@ def get_help_keyboards(lang="ro"):
                 [InlineKeyboardButton(back, callback_data="help_back")],
             ]
         },
-        "help_whales": {
-            "title": "🐋 Balene" if lang == "ro" else "🐋 Whales",
-            "keyboard": [
-                [InlineKeyboardButton("🐋 Vezi Tranzactii" if lang == "ro" else "🐋 View Transactions", callback_data="exec_whales")],
-                [InlineKeyboardButton(back, callback_data="help_back")],
-            ]
-        },
         "help_settings": {
             "title": "⚙️ Setari" if lang == "ro" else "⚙️ Settings",
             "keyboard": [
@@ -908,8 +848,7 @@ async def cmd_start(update, context):
         [InlineKeyboardButton("📁 Portofoliu" if lang == 'ro' else "📁 Portfolio", callback_data="portfolio"),
          InlineKeyboardButton("👁 Watchlist",  callback_data="watchlist")],
         [InlineKeyboardButton("📊 Report",     callback_data="report"),
-         InlineKeyboardButton("🐋 " + ("Balene" if lang == 'ro' else "Whales"), callback_data="whales")],
-        [InlineKeyboardButton("❓ Help",        callback_data="help_back")],
+         InlineKeyboardButton("❓ Help",        callback_data="help_back")],
     ]
     await update.message.reply_text(t(uid, "welcome"), reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -1064,23 +1003,6 @@ async def cmd_watchlist(update, context):
         else:
             lines.append(symbol + ": N/A\n")
     keyboard = [[InlineKeyboardButton("Refresh", callback_data="watchlist")]]
-    await update.message.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def cmd_whales(update, context):
-    uid = update.effective_user.id
-    await update.message.reply_text(t(uid, "loading"))
-    txs = await asyncio.to_thread(get_whale_transactions)
-    if not txs:
-        await update.message.reply_text(t(uid, "no_whales"))
-        return
-    lines = [t(uid, "whales_title") + "\n"]
-    for tx in txs[:8]:
-        val = fmt_large(tx["value_usd"])
-        if "note" in tx:
-            lines.append(tx["symbol"] + " - " + val + " - " + tx["note"])
-        else:
-            lines.append(tx["symbol"] + " - " + val + "\n  " + tx["from"] + " -> " + tx["to"])
-    keyboard = [[InlineKeyboardButton("Refresh", callback_data="whales")]]
     await update.message.reply_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def cmd_trending(update, context):
@@ -1341,21 +1263,6 @@ async def button_callback(update, context):
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="report")]]
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
-    elif data == "whales":
-        txs = get_whale_transactions()
-        if not txs:
-            await query.edit_message_text(t(uid, "no_whales"), reply_markup=back_keyboard(lang))
-            return
-        lines = [t(uid, "whales_title") + "\n"]
-        for tx in txs[:8]:
-            val = fmt_large(tx["value_usd"])
-            if "note" in tx:
-                lines.append(tx["symbol"] + " - " + val + " - " + tx["note"])
-            else:
-                lines.append(tx["symbol"] + " - " + val + "\n  " + tx["from"] + " -> " + tx["to"])
-        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="whales")]]
-        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
-
     # ── Exec commands from help menu ───────────────────────────────────────────
     elif data == "exec_portfolio":
         user = get_user(uid)
@@ -1521,22 +1428,6 @@ async def button_callback(update, context):
             lines.append(c["symbol"] + " #" + str(c["rank"]) + "  " + fmt_price(c["price"]) + "  " + chg_emoji + " " + sign + "{:.1f}%".format(chg))
         keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_sector:" + key)],
                     [InlineKeyboardButton(back, callback_data="exec_sector_list")]]
-        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif data == "exec_whales":
-        txs = await asyncio.to_thread(get_whale_transactions)
-        if not txs:
-            await query.edit_message_text(t(uid, "no_whales"), reply_markup=back_keyboard(lang))
-            return
-        lines = [t(uid, "whales_title") + "\n"]
-        for tx in txs[:8]:
-            val = fmt_large(tx["value_usd"])
-            if "note" in tx:
-                lines.append(tx["symbol"] + " - " + val + " - " + tx["note"])
-            else:
-                lines.append(tx["symbol"] + " - " + val + "\n  " + tx["from"] + " -> " + tx["to"])
-        keyboard = [[InlineKeyboardButton("🔄 Refresh", callback_data="exec_whales")],
-                    [InlineKeyboardButton(back, callback_data="help_whales")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
     # ── Watchlist add/remove ───────────────────────────────────────────────────
@@ -1982,7 +1873,6 @@ def main():
     app.add_handler(CommandHandler("portfolio",    cmd_portfolio))
     app.add_handler(CommandHandler("pnl",          cmd_pnl))
     app.add_handler(CommandHandler("watchlist",    cmd_watchlist))
-    app.add_handler(CommandHandler("whales",       cmd_whales))
     app.add_handler(CommandHandler("trending",     cmd_trending))
     app.add_handler(CommandHandler("stats",        cmd_stats))
     app.add_handler(CommandHandler("sector",       cmd_sector))
