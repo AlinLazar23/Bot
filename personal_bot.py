@@ -65,7 +65,6 @@ T = {
         "currency_set":       "Moneda setata: {}",
         "report_set":         "Raportul zilnic va fi trimis la {}",
         "report_title":       "Raport Zilnic Personal",
-        "risk_title":         "Scor de Risc Portofoliu",
         "whales_title":       "Tranzactii Balene (>$1M)",
         "no_whales":          "Nu au fost detectate tranzactii mari recent.",
         "alert_fear_set":     "Alerta Fear & Greed setata: sub {}",
@@ -87,7 +86,6 @@ T = {
         "currency_set":       "Currency set: {}",
         "report_set":         "Daily report will be sent at {}",
         "report_title":       "Daily Personal Report",
-        "risk_title":         "Portfolio Risk Score",
         "whales_title":       "Whale Transactions (>$1M)",
         "no_whales":          "No large transactions detected recently.",
         "alert_fear_set":     "Fear & Greed alert set: below {}",
@@ -761,57 +759,6 @@ def calculate_portfolio(uid):
         "total_pnl_pct": total_pnl_pct, "currency": user.get("currency", "USD"),
     }
 
-def calculate_risk_score(pf, lang="ro"):
-    if not pf or not pf["coins"]:
-        return 5, "N/A", []
-    coins = pf["coins"]
-    total = pf["total_value"]
-    notes = []
-    score = 3
-    for c in coins:
-        pct = (c["current_value"] / total * 100) if total > 0 else 0
-        if pct > 70:
-            score += 3
-            notes.append(
-                "Concentratie mare in " + c["symbol"] + " (" + "{:.0f}%".format(pct) + ")"
-                if lang == "ro" else
-                "High concentration in " + c["symbol"] + " (" + "{:.0f}%".format(pct) + ")"
-            )
-        elif pct > 50:
-            score += 2
-            notes.append(
-                "Expunere semnificativa la " + c["symbol"] + " (" + "{:.0f}%".format(pct) + ")"
-                if lang == "ro" else
-                "Significant exposure to " + c["symbol"] + " (" + "{:.0f}%".format(pct) + ")"
-            )
-    stable  = sum(c["current_value"] for c in coins if c["symbol"] in {"BTC", "ETH"})
-    alt_pct = ((total - stable) / total * 100) if total > 0 else 0
-    if alt_pct > 80:
-        score += 3
-        notes.append("Expunere altcoin foarte mare ({:.0f}%)".format(alt_pct) if lang == "ro" else "Very high altcoin exposure ({:.0f}%)".format(alt_pct))
-    elif alt_pct > 60:
-        score += 2
-        notes.append("Expunere altcoin mare ({:.0f}%)".format(alt_pct) if lang == "ro" else "High altcoin exposure ({:.0f}%)".format(alt_pct))
-    elif alt_pct > 40:
-        score += 1
-        notes.append("Expunere altcoin moderata ({:.0f}%)".format(alt_pct) if lang == "ro" else "Moderate altcoin exposure ({:.0f}%)".format(alt_pct))
-    else:
-        notes.append("Diversificare BTC/ETH buna ({:.0f}% alts)".format(alt_pct) if lang == "ro" else "Good BTC/ETH diversification ({:.0f}% alts)".format(alt_pct))
-    n = len(coins)
-    if n == 1:
-        score += 2
-        notes.append("Nicio diversificare (1 moneda)" if lang == "ro" else "No diversification (1 coin only)")
-    elif n < 3:
-        score += 1
-        notes.append("Diversificare mica (" + str(n) + " monede)" if lang == "ro" else "Low diversification (" + str(n) + " coins)")
-    elif n >= 5:
-        notes.append("Diversificare buna (" + str(n) + " monede)" if lang == "ro" else "Good diversification (" + str(n) + " coins)")
-    score = max(1, min(10, score))
-    if score <= 3:   label = "Scazut"    if lang == "ro" else "Low"
-    elif score <= 5: label = "Moderat"   if lang == "ro" else "Moderate"
-    elif score <= 7: label = "Ridicat"   if lang == "ro" else "High"
-    else:            label = "Foarte Ridicat" if lang == "ro" else "Very High"
-    return score, label, notes
 
 # ─── DAILY REPORT ──────────────────────────────────────────────────────────────
 
@@ -849,7 +796,7 @@ async def generate_report(uid):
                 lines.append(symbol + ": " + fmt_price(pd["price"]) + " | " + fmt_pct(pd.get("change_24h", 0)))
         lines.append("")
 
-    lines += ["---", "/portfolio | /watchlist | /risk"]
+    lines += ["---", "/portfolio | /watchlist"]
     return "\n".join(lines)
 
 # ─── HELP MENU ─────────────────────────────────────────────────────────────────
@@ -889,7 +836,6 @@ def get_help_keyboards(lang="ro"):
             "keyboard": [
                 [InlineKeyboardButton("📊 Vezi Portofoliu" if lang == "ro" else "📊 View Portfolio", callback_data="exec_portfolio")],
                 [InlineKeyboardButton("📈 P&L Report",           callback_data="exec_pnl")],
-                [InlineKeyboardButton("⚠️ Scor de Risc" if lang == "ro" else "⚠️ Risk Score", callback_data="exec_risk")],
                 [InlineKeyboardButton("➕ Adauga Moneda" if lang == "ro" else "➕ Add Coin", callback_data="exec_pf_add_list")],
                 [InlineKeyboardButton("➖ Sterge Moneda" if lang == "ro" else "➖ Remove Coin", callback_data="exec_pf_remove_list")],
                 [InlineKeyboardButton(back, callback_data="help_back")],
@@ -1163,9 +1109,9 @@ async def cmd_stats(update, context):
         if attempt > 0:
             await asyncio.sleep(2)
         fg          = get_fear_greed_stats()
-        time.sleep(0.5)
+        await asyncio.sleep(0.5)
         global_data = get_global_market()
-        time.sleep(0.5)
+        await asyncio.sleep(0.5)
         prices      = get_btc_eth_prices()
         if fg and global_data and prices:
             break
@@ -1321,20 +1267,6 @@ async def cmd_set_currency(update, context):
     save_data()
     await update.message.reply_text(t(uid, "currency_set", user["currency"]))
 
-async def cmd_risk(update, context):
-    uid  = update.effective_user.id
-    user = get_user(uid)
-    if not user.get("portfolio"):
-        await update.message.reply_text(t(uid, "portfolio_empty"))
-        return
-    await update.message.reply_text(t(uid, "loading"))
-    lang2 = get_user(uid).get("lang", "ro")
-    pf    = calculate_portfolio(uid)
-    score, label, notes = calculate_risk_score(pf, lang2)
-    lines = [t(uid, "risk_title") + "\n", "Score: " + str(score) + "/10 - " + label + "\n"]
-    for note in notes:
-        lines.append("- " + note)
-    await update.message.reply_text("\n".join(lines))
 
 # ─── CALLBACKS ─────────────────────────────────────────────────────────────────
 
@@ -1475,19 +1407,6 @@ async def button_callback(update, context):
         keyboard = [[InlineKeyboardButton(back, callback_data="help_portfolio")]]
         await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
 
-    elif data == "exec_risk":
-        user = get_user(uid)
-        if not user.get("portfolio"):
-            await query.edit_message_text(t(uid, "portfolio_empty"), reply_markup=back_keyboard(lang))
-            return
-        pf    = calculate_portfolio(uid)
-        score, label, notes = calculate_risk_score(pf, lang)
-        lines = [t(uid, "risk_title") + "\n", "Score: " + str(score) + "/10 - " + label + "\n"]
-        for note in notes:
-            lines.append("- " + note)
-        keyboard = [[InlineKeyboardButton(back, callback_data="help_portfolio")]]
-        await query.edit_message_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(keyboard))
-
     elif data == "exec_watchlist":
         user = get_user(uid)
         if not user.get("watchlist"):
@@ -1564,9 +1483,9 @@ async def button_callback(update, context):
             if attempt > 0:
                 await asyncio.sleep(2)
             fg          = get_fear_greed_stats()
-            time.sleep(0.5)
+            await asyncio.sleep(0.5)
             global_data = get_global_market()
-            time.sleep(0.5)
+            await asyncio.sleep(0.5)
             prices      = get_btc_eth_prices()
             if fg and global_data and prices:
                 break
@@ -1878,9 +1797,9 @@ async def button_callback(update, context):
             if attempt > 0:
                 await asyncio.sleep(2)
             fg          = get_fear_greed_stats()
-            time.sleep(0.5)
+            await asyncio.sleep(0.5)
             global_data = get_global_market()
-            time.sleep(0.5)
+            await asyncio.sleep(0.5)
             prices      = get_btc_eth_prices()
             if fg and global_data and prices:
                 break
@@ -2076,7 +1995,6 @@ def main():
     app.add_handler(CommandHandler("set_report",   cmd_set_report))
     app.add_handler(CommandHandler("set_lang",     cmd_set_lang))
     app.add_handler(CommandHandler("set_currency", cmd_set_currency))
-    app.add_handler(CommandHandler("risk",         cmd_risk))
     app.add_handler(CallbackQueryHandler(button_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_force_reply))
 
