@@ -356,6 +356,26 @@ def get_current_price_simple(slug):
     pd = get_price(slug)
     return pd["price"] if pd else None
 
+def get_prices_batch(slugs):
+    if not slugs:
+        return {}
+    uncached = [s for s in slugs if not cache_get("price:" + s)]
+    if uncached:
+        data = cg_get("/simple/price", params={
+            "ids": ",".join(uncached), "vs_currencies": "usd",
+            "include_24hr_change": "true", "include_market_cap": "true",
+        })
+        if data:
+            for slug in uncached:
+                if slug in data:
+                    result = {
+                        "price":      data[slug].get("usd", 0),
+                        "change_24h": data[slug].get("usd_24h_change", 0),
+                        "market_cap": data[slug].get("usd_market_cap", 0),
+                    }
+                    cache_set("price:" + slug, result)
+    return {s: cache_get("price:" + s) for s in slugs}
+
 def get_fear_greed(fresh=False):
     if not fresh:
         cached = cache_get("fear_greed")
@@ -820,10 +840,11 @@ async def generate_report(uid):
 
     watchlist = user.get("watchlist", [])
     if watchlist:
+        slugs = [resolve_slug(s) for s in watchlist]
+        prices = get_prices_batch(slugs)
         lines.append("WATCHLIST")
-        for symbol in watchlist:
-            pd = get_price(resolve_slug(symbol))
-            time.sleep(0.3)
+        for symbol, slug in zip(watchlist, slugs):
+            pd = prices.get(slug)
             if pd:
                 lines.append(symbol + ": " + fmt_price(pd["price"]) + " | " + fmt_pct(pd.get("change_24h", 0)))
         lines.append("")
