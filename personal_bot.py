@@ -853,9 +853,54 @@ async def cmd_start(update, context):
     await update.message.reply_text(t(uid, "welcome"), reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def cmd_help(update, context):
-    uid  = update.effective_user.id
-    lang = get_user(uid).get("lang", "ro")
-    await update.message.reply_text("Alege o categorie:" if lang == "ro" else "Choose a category:", reply_markup=help_main_keyboard(lang))
+    uid     = update.effective_user.id
+    lang    = get_user(uid).get("lang", "ro")
+    chat_id = update.effective_chat.id
+
+    logger.info(f"cmd_help: uid={uid}, chat_id={chat_id}, type={update.effective_chat.type}")
+
+    if update.effective_chat.type in ("group", "supergroup"):
+        # Sterge comanda /help din grup imediat
+        try:
+            await update.message.delete()
+        except Exception:
+            pass
+
+        # Incearca sa trimita DM
+        try:
+            await context.bot.send_message(
+                chat_id=uid,
+                text="Alege o categorie:" if lang == "ro" else "Choose a category:",
+                reply_markup=help_main_keyboard(lang)
+            )
+        except Exception as e:
+            logger.warning(f"cmd_help DM failed for uid={uid}: {e}")
+            # Utilizatorul nu a pornit botul in privat - trimite notificare cu deep-link
+            bot_info = await context.bot.get_me()
+            name = update.effective_user.first_name or "tu"
+            btn  = "Primeste help in privat" if lang == "ro" else "Get help in private"
+            keyboard = InlineKeyboardMarkup([[
+                InlineKeyboardButton(btn, url=f"https://t.me/{bot_info.username}?start=help")
+            ]])
+            msg = await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"{name}, apasa butonul pentru a porni botul in privat:"
+                if lang == "ro" else
+                f"{name}, press the button to start the bot in private:",
+                reply_markup=keyboard
+            )
+            # Sterge notificarea din grup dupa 30 de secunde
+            async def _delete_notification(ctx):
+                try:
+                    await ctx.bot.delete_message(chat_id=chat_id, message_id=msg.message_id)
+                except Exception:
+                    pass
+            context.job_queue.run_once(_delete_notification, 30)
+    else:
+        await update.message.reply_text(
+            "Alege o categorie:" if lang == "ro" else "Choose a category:",
+            reply_markup=help_main_keyboard(lang)
+        )
 
 async def cmd_chatid(update, context):
     await update.message.reply_text(
